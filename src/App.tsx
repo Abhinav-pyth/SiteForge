@@ -7,6 +7,9 @@ import {
   FolderOpen, Edit3,
   Clock, CheckCircle2, AlertCircle, Info, Moon, Sun
 } from 'lucide-react';
+import TextField from '@mui/material/TextField';
+import Button from '@mui/material/Button';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { DndContext, DragEndEvent, closestCenter } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -44,6 +47,71 @@ function getTimeAgo(dateStr: string): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
+// MUI Theme
+const theme = createTheme({
+  palette: {
+    mode: 'light',
+    primary: {
+      main: '#000000',
+    },
+    background: {
+      default: '#ffffff',
+      paper: '#ffffff',
+    },
+  },
+  typography: {
+    fontFamily: '"Inter", "system-ui", "-apple-system", sans-serif',
+  },
+  components: {
+    MuiTextField: {
+      styleOverrides: {
+        root: {
+          '& .MuiOutlinedInput-root': {
+            borderRadius: '12px',
+            backgroundColor: '#ffffff',
+            '& fieldset': {
+              borderColor: '#e5e7eb',
+              borderWidth: '1px',
+            },
+            '&:hover fieldset': {
+              borderColor: '#d1d5db',
+            },
+            '&.Mui-focused fieldset': {
+              borderColor: '#000000',
+              borderWidth: '2px',
+            },
+          },
+          '& .MuiInputBase-input': {
+            padding: '16px 20px',
+            fontSize: '16px',
+            lineHeight: '1.5',
+          },
+          '& .MuiInputBase-inputMultiline': {
+            padding: '0 !important',
+          },
+        },
+      },
+    },
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          textTransform: 'none',
+          fontWeight: 600,
+          borderRadius: '8px',
+          padding: '10px 24px',
+          fontSize: '14px',
+        },
+        contained: {
+          boxShadow: 'none',
+          '&:hover': {
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+          },
+        },
+      },
+    },
+  },
+});
+
 export default function App() {
   const state = useStore();
 
@@ -62,20 +130,22 @@ export default function App() {
   }, []);
 
   return (
-    <div className="h-full w-full overflow-hidden bg-white">
-      {state.view === 'landing' && <LandingView />}
-      {state.view === 'builder' && <BuilderView />}
-      {state.view === 'dashboard' && <DashboardView />}
-      {state.view === 'templates' && <TemplatesView />}
-      {state.view === 'pricing' && <PricingView />}
-      <Toasts />
-      {state.showAuthModal && <AuthModal />}
-      {state.isGenerating && <GeneratingOverlay />}
-      {state.isPublishing && <PublishingOverlay />}
-      {state.view === 'builder' && state.showAddSection && <AddSectionModal />}
-      {state.view === 'builder' && state.showThemePanel && <ThemePanel />}
-      {state.view === 'builder' && state.showExportMenu && <ExportModal />}
-    </div>
+    <ThemeProvider theme={theme}>
+      <div className="h-full w-full overflow-hidden bg-white">
+        {state.view === 'landing' && <LandingView />}
+        {state.view === 'builder' && <BuilderView />}
+        {state.view === 'dashboard' && <DashboardView />}
+        {state.view === 'templates' && <TemplatesView />}
+        {state.view === 'pricing' && <PricingView />}
+        <Toasts />
+        {state.showAuthModal && <AuthModal />}
+        {state.isGenerating && <GeneratingOverlay />}
+        {state.isPublishing && <PublishingOverlay />}
+        {state.view === 'builder' && state.showAddSection && <AddSectionModal />}
+        {state.view === 'builder' && state.showThemePanel && <ThemePanel />}
+        {state.view === 'builder' && state.showExportMenu && <ExportModal />}
+      </div>
+    </ThemeProvider>
   );
 }
 
@@ -162,26 +232,61 @@ function LandingView() {
           {/* AI Prompt Box */}
           <div className="max-w-[950px] mx-auto mb-10">
             <div className="bg-white border border-gray-200 rounded-2xl shadow-xl shadow-gray-200/40 overflow-hidden">
-              <textarea
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Create a modern website for a luxury women's footwear brand with a hero section, products, testimonials and contact page..."
-                className="w-full p-6 md:p-7 text-base md:text-lg text-black placeholder-gray-400 resize-none outline-none min-h-[140px] leading-relaxed"
-                rows={4}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleGenerate(); } }}
-              />
+              <div className="p-2">
+                <TextField
+                  multiline
+                  rows={5}
+                  fullWidth
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  placeholder="Create a modern website for a luxury women's footwear brand with a hero section, products, testimonials and contact page..."
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleGenerate(); } }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      backgroundColor: 'transparent',
+                      '& fieldset': {
+                        border: 'none',
+                      },
+                    },
+                    '& .MuiInputBase-input': {
+                      fontSize: '17px',
+                      lineHeight: '1.6',
+                      padding: '20px 24px !important',
+                      color: '#111827',
+                      '&::placeholder': {
+                        color: '#9ca3af',
+                        opacity: 1,
+                      },
+                    },
+                  }}
+                />
+              </div>
               <div className="flex items-center justify-between px-6 md:px-7 py-4 border-t border-gray-100 bg-gradient-to-r from-gray-50/80 to-gray-50/40">
                 <button onClick={() => setView('templates')} className="text-sm text-gray-600 hover:text-black flex items-center gap-1.5 px-3 py-2 rounded-lg hover:bg-white transition">
                   <Layout size={14} /> Browse Templates
                 </button>
-                <button
+                <Button
+                  variant="contained"
                   onClick={handleGenerate}
                   disabled={!prompt.trim()}
-                  className="px-6 py-3 bg-black text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2 transition shadow-md hover:shadow-lg"
+                  startIcon={<Sparkles size={15} />}
+                  sx={{
+                    backgroundColor: '#000000',
+                    color: '#ffffff',
+                    padding: '12px 28px',
+                    fontSize: '15px',
+                    '&:hover': {
+                      backgroundColor: '#1f2937',
+                    },
+                    '&.Mui-disabled': {
+                      backgroundColor: '#000000',
+                      opacity: 0.3,
+                      color: '#ffffff',
+                    },
+                  }}
                 >
-                  <Sparkles size={15} />
                   Generate Website
-                </button>
+                </Button>
               </div>
             </div>
           </div>
