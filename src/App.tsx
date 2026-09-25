@@ -1,12 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
-  Sparkles, Monitor, Tablet, Smartphone, Code, Eye, Download, Send, Plus,
+  Sparkles, Monitor, Tablet, Smartphone, Code, Download, Send, Plus,
   Undo2, Redo2, Save, Trash2, Copy, ChevronUp, ChevronDown, X, Check,
-  Palette, Settings, Globe, Layout, Layers, Zap, ArrowLeft,
-  Rocket, FileCode, Grid3X3, CreditCard,
+  Palette, Settings, Globe, Layout, Layers, ArrowLeft, GripVertical,
+  Rocket, FileCode, Grid3X3, CreditCard, MessageCircle,
   FolderOpen, Edit3,
   Clock, CheckCircle2, AlertCircle, Info, Moon, Sun
 } from 'lucide-react';
+import { DndContext, DragEndEvent, closestCenter } from '@dnd-kit/core';
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import {
   WebsiteConfig, Section, SectionType, Project, ChatMessage,
   ViewMode, ThemeSettings, THEME_PRESETS
@@ -15,13 +18,12 @@ import { generateWebsite, modifyWebsite, generateAIResponse, generateSection } f
 import {
   getState, subscribe, setState, initializeStore, pushHistory, undo, redo,
   saveProject, deleteProject, duplicateProject, renameProject, updateWebsite,
-  selectSection, setView, setViewMode, updateTheme, addToast
+  selectSection, setView, setViewMode, updateTheme, addToast, autoSave
 } from './lib/store';
 import { generateFullHTML, generateReactCode, downloadHTML, downloadJSON } from './lib/export';
 import { templates, examplePrompts } from './lib/templates';
 import { SectionRenderer } from './components/SectionRenderer';
 
-// ============ HOOK ============
 function useStore() {
   const [state, setLocalState] = useState(getState());
   useEffect(() => {
@@ -30,7 +32,18 @@ function useStore() {
   return state;
 }
 
-// ============ MAIN APP ============
+function getTimeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const seconds = Math.floor(diff / 1000);
+  if (seconds < 5) return 'just now';
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
 export default function App() {
   const state = useStore();
 
@@ -38,28 +51,18 @@ export default function App() {
     initializeStore();
   }, []);
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
-        e.preventDefault();
-        undo();
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && e.shiftKey) {
-        e.preventDefault();
-        redo();
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-        e.preventDefault();
-        saveProject();
-      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && e.shiftKey) { e.preventDefault(); redo(); }
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); saveProject(); }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
   return (
-    <div className="h-full w-full overflow-hidden bg-[#f8fafc]">
+    <div className="h-full w-full overflow-hidden bg-white">
       {state.view === 'landing' && <LandingView />}
       {state.view === 'builder' && <BuilderView />}
       {state.view === 'dashboard' && <DashboardView />}
@@ -80,32 +83,37 @@ export default function App() {
 function TopNav() {
   const state = useStore();
   return (
-    <header className="h-14 border-b border-[#e2e8f0] bg-white flex items-center justify-between px-4 shrink-0">
+    <header className="h-14 border-b border-gray-200 bg-white flex items-center justify-between px-4 shrink-0">
       <div className="flex items-center gap-6">
-        <button onClick={() => setView('landing')} className="flex items-center gap-2 font-bold text-lg">
-          <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-            <Sparkles size={16} className="text-white" />
+        <button onClick={() => setView('landing')} className="flex items-center gap-2 font-semibold text-base">
+          <div className="w-7 h-7 bg-black rounded-md flex items-center justify-center">
+            <Sparkles size={14} className="text-white" />
           </div>
-          <span className="text-[#1e293b]">SiteForge</span>
-          <span className="text-indigo-500">AI</span>
+          <span>SiteForge AI</span>
         </button>
         <nav className="hidden md:flex items-center gap-1">
-          <button onClick={() => setView('dashboard')} className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${state.view === 'dashboard' ? 'bg-indigo-50 text-indigo-600' : 'text-[#64748b] hover:text-[#1e293b] hover:bg-gray-50'}`}>
-            <span className="flex items-center gap-1.5"><FolderOpen size={14} />Projects</span>
-          </button>
-          <button onClick={() => setView('templates')} className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${state.view === 'templates' ? 'bg-indigo-50 text-indigo-600' : 'text-[#64748b] hover:text-[#1e293b] hover:bg-gray-50'}`}>
-            <span className="flex items-center gap-1.5"><Grid3X3 size={14} />Templates</span>
-          </button>
-          <button onClick={() => setView('pricing')} className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${state.view === 'pricing' ? 'bg-indigo-50 text-indigo-600' : 'text-[#64748b] hover:text-[#1e293b] hover:bg-gray-50'}`}>
-            <span className="flex items-center gap-1.5"><CreditCard size={14} />Pricing</span>
-          </button>
+          {[
+            { view: 'dashboard' as const, label: 'Projects', icon: <FolderOpen size={14} /> },
+            { view: 'templates' as const, label: 'Templates', icon: <Grid3X3 size={14} /> },
+            { view: 'pricing' as const, label: 'Pricing', icon: <CreditCard size={14} /> },
+          ].map(item => (
+            <button
+              key={item.view}
+              onClick={() => setView(item.view)}
+              className={`px-3 py-1.5 rounded text-sm flex items-center gap-1.5 transition ${
+                state.view === item.view ? 'bg-gray-100 text-black font-medium' : 'text-gray-500 hover:text-black hover:bg-gray-50'
+              }`}
+            >
+              {item.icon} {item.label}
+            </button>
+          ))}
         </nav>
       </div>
       <div className="flex items-center gap-2">
         {state.currentProject && state.view === 'builder' && (
-          <span className="text-sm text-[#64748b] hidden sm:block">{state.currentProject.name}</span>
+          <span className="text-sm text-gray-500 hidden sm:block">{state.currentProject.name}</span>
         )}
-        <button onClick={() => setState({ showAuthModal: true })} className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold">
+        <button onClick={() => setState({ showAuthModal: true })} className="w-8 h-8 rounded-full bg-gray-900 flex items-center justify-center text-white text-xs font-medium">
           U
         </button>
       </div>
@@ -116,7 +124,6 @@ function TopNav() {
 // ============ LANDING VIEW ============
 function LandingView() {
   const [prompt, setPrompt] = useState('');
-  const state = useStore();
 
   const handleGenerate = () => {
     if (!prompt.trim()) return;
@@ -129,101 +136,89 @@ function LandingView() {
     setPrompt(template?.prompt || `Create a ${example.toLowerCase()} website.`);
   };
 
-  const handleTemplateClick = (template: typeof templates[0]) => {
-    setPrompt(template.prompt);
-  };
-
   return (
     <div className="h-full flex flex-col">
       <TopNav />
       <main className="flex-1 overflow-auto">
-        <div className="max-w-4xl mx-auto px-4 py-12 md:py-20">
-          <div className="text-center mb-10 animate-fade-in">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-sm font-medium mb-6">
-              <Sparkles size={14} />
-              AI-Powered Website Builder
+        <div className="max-w-2xl mx-auto px-4 py-16 md:py-24">
+          {/* Headline */}
+          <div className="text-center mb-10">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium mb-5">
+              <Sparkles size={12} />
+              AI Website Builder
             </div>
-            <h1 className="text-4xl md:text-6xl font-bold text-[#1e293b] mb-4 leading-tight">
-              Build your website<br />
-              <span className="gradient-text">with a sentence.</span>
+            <h1 className="text-3xl md:text-5xl font-bold text-black mb-3 leading-tight tracking-tight">
+              Build websites with a sentence.
             </h1>
-            <p className="text-lg md:text-xl text-[#64748b] max-w-2xl mx-auto">
-              Describe your idea. Our AI turns it into a beautiful, responsive website in minutes.
+            <p className="text-base md:text-lg text-gray-500">
+              Describe your idea. AI turns it into a real website.
             </p>
           </div>
 
-          <div className="animate-slide-up">
-            <div className="bg-white rounded-2xl shadow-lg shadow-indigo-100/50 border border-[#e2e8f0] p-2 mb-4">
-              <div className="flex items-center gap-2">
-                <div className="flex-1">
-                  <textarea
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="What do you want to build? e.g., Create a modern website for a coffee shop..."
-                    className="w-full p-4 text-[#1e293b] placeholder-[#94a3b8] resize-none outline-none text-base min-h-[80px] rounded-xl"
-                    rows={3}
-                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleGenerate(); } }}
-                  />
-                </div>
-              </div>
-              <div className="flex items-center justify-between px-2 pb-2">
-                <div className="flex items-center gap-2">
-                  <button onClick={() => setState({ view: 'templates' })} className="text-sm text-[#64748b] hover:text-indigo-600 flex items-center gap-1 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition">
-                    <Layout size={14} /> Start from Template
-                  </button>
-                </div>
-                <button
-                  onClick={handleGenerate}
-                  disabled={!prompt.trim()}
-                  className="btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Sparkles size={16} />
-                  Generate Website
-                </button>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap justify-center gap-2 mt-6">
-              {examplePrompts.map((ep) => (
-                <button
-                  key={ep}
-                  onClick={() => handleExampleClick(ep)}
-                  className="px-3 py-1.5 bg-white border border-[#e2e8f0] rounded-full text-sm text-[#64748b] hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50 transition"
-                >
-                  {ep}
-                </button>
-              ))}
+          {/* Prompt Box */}
+          <div className="bg-white border border-gray-200 rounded-xl p-3 mb-5 shadow-sm">
+            <textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="e.g. Create a modern website for a coffee shop in Indore with online ordering, menu, and contact..."
+              className="w-full p-3 text-black placeholder-gray-400 resize-none outline-none text-sm min-h-[80px] rounded-lg"
+              rows={3}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleGenerate(); } }}
+            />
+            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+              <button onClick={() => setView('templates')} className="text-xs text-gray-500 hover:text-black flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-50">
+                <Layout size={12} /> Templates
+              </button>
+              <button
+                onClick={handleGenerate}
+                disabled={!prompt.trim()}
+                className="px-4 py-2 bg-black text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1.5 transition"
+              >
+                <Sparkles size={14} />
+                Generate
+              </button>
             </div>
           </div>
 
+          {/* Example Prompts */}
+          <div className="flex flex-wrap justify-center gap-1.5">
+            {examplePrompts.map((ep) => (
+              <button
+                key={ep}
+                onClick={() => handleExampleClick(ep)}
+                className="px-2.5 py-1 border border-gray-200 rounded-full text-xs text-gray-600 hover:border-black hover:text-black transition"
+              >
+                {ep}
+              </button>
+            ))}
+          </div>
+
           {/* Demo button */}
-          <div className="text-center mt-12">
+          <div className="text-center mt-10">
             <button
               onClick={() => {
-                setPrompt('Create a modern SaaS landing page for an AI analytics startup called CloudFlow. Include hero, features, pricing, testimonials, FAQ, and CTA sections.');
-                setTimeout(() => {
-                  setState({ isGenerating: true, generationStep: 0 });
-                  simulateGeneration('Create a modern SaaS landing page for an AI analytics startup called CloudFlow. Include hero, features, pricing, testimonials, FAQ, and CTA sections.');
-                }, 100);
+                const demoPrompt = 'Create a modern SaaS landing page for an AI analytics startup called CloudFlow. Include hero, features, pricing, testimonials, FAQ, and CTA sections.';
+                setState({ isGenerating: true, generationStep: 0 });
+                simulateGeneration(demoPrompt);
               }}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-indigo-200 transition-all hover:-translate-y-0.5"
+              className="inline-flex items-center gap-2 px-5 py-2.5 border border-gray-200 text-sm font-medium rounded-lg hover:bg-gray-50 transition"
             >
-              <Rocket size={18} />
-              Try Demo — Generate a Sample Website
+              <Rocket size={14} />
+              Try a demo website
             </button>
           </div>
 
           {/* Features */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-20">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-16">
             {[
-              { icon: <Zap size={24} />, title: 'Instant Generation', desc: 'Describe your vision and watch it come to life in seconds.' },
-              { icon: <Palette size={24} />, title: 'AI-Powered Design', desc: 'Intelligent themes, layouts, and content tailored to your brand.' },
-              { icon: <Code size={24} />, title: 'Export Anywhere', desc: 'Download clean HTML, React code, or publish directly.' },
+              { icon: '⚡', title: 'Instant Generation', desc: 'Describe your vision and see it come to life in seconds.' },
+              { icon: '🎨', title: 'AI Design', desc: 'Intelligent themes and layouts tailored to your brand.' },
+              { icon: '📦', title: 'Export Anywhere', desc: 'Download clean HTML or publish directly.' },
             ].map((f, i) => (
-              <div key={i} className="bg-white rounded-xl p-6 border border-[#e2e8f0] card-hover">
-                <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-500 mb-4">{f.icon}</div>
-                <h3 className="font-semibold text-[#1e293b] mb-2">{f.title}</h3>
-                <p className="text-[#64748b] text-sm">{f.desc}</p>
+              <div key={i} className="p-5 border border-gray-100 rounded-xl">
+                <div className="text-xl mb-2">{f.icon}</div>
+                <h3 className="font-medium text-sm text-black mb-1">{f.title}</h3>
+                <p className="text-xs text-gray-500 leading-relaxed">{f.desc}</p>
               </div>
             ))}
           </div>
@@ -236,37 +231,27 @@ function LandingView() {
 // ============ GENERATION OVERLAY ============
 function GeneratingOverlay() {
   const state = useStore();
-  const steps = [
-    'Understanding your idea',
-    'Planning website structure',
-    'Creating sections',
-    'Designing responsive layout',
-    'Generating content',
-    'Preparing preview',
-  ];
+  const steps = ['Understanding your idea', 'Planning structure', 'Creating sections', 'Designing layout', 'Generating content', 'Preparing preview'];
 
   return (
-    <div className="fixed inset-0 z-50 bg-white/95 backdrop-blur-sm flex items-center justify-center">
-      <div className="max-w-md w-full px-6 animate-fade-in">
+    <div className="fixed inset-0 z-50 bg-white flex items-center justify-center">
+      <div className="max-w-sm w-full px-6">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-pulse-slow">
-            <Sparkles size={28} className="text-white" />
+          <div className="w-12 h-12 bg-black rounded-xl flex items-center justify-center mx-auto mb-4">
+            <Sparkles size={20} className="text-white" />
           </div>
-          <h2 className="text-2xl font-bold text-[#1e293b] mb-2">Building your website</h2>
-          <p className="text-[#64748b]">Our AI is crafting something amazing...</p>
+          <h2 className="text-lg font-semibold text-black mb-1">Building your website</h2>
+          <p className="text-sm text-gray-500">This will take a moment...</p>
         </div>
-        <div className="space-y-3">
+        <div className="space-y-2">
           {steps.map((step, i) => (
-            <div key={i} className={`flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ${i <= state.generationStep ? 'bg-indigo-50' : 'opacity-40'}`}>
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${i < state.generationStep ? 'bg-green-500' : i === state.generationStep ? 'bg-indigo-500 animate-pulse' : 'bg-gray-200'}`}>
-                {i < state.generationStep ? <Check size={14} className="text-white" /> : i === state.generationStep ? <div className="w-2 h-2 bg-white rounded-full" /> : null}
+            <div key={i} className={`flex items-center gap-2.5 py-1.5 text-sm ${i <= state.generationStep ? 'text-black' : 'text-gray-300'}`}>
+              <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${i < state.generationStep ? 'bg-black' : i === state.generationStep ? 'bg-black animate-pulse' : 'bg-gray-200'}`}>
+                {i < state.generationStep && <Check size={10} className="text-white" />}
               </div>
-              <span className={`text-sm font-medium ${i <= state.generationStep ? 'text-[#1e293b]' : 'text-[#94a3b8]'}`}>{step}</span>
+              {step}
             </div>
           ))}
-        </div>
-        <div className="mt-6 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-          <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full transition-all duration-500" style={{ width: `${((state.generationStep + 1) / steps.length) * 100}%` }} />
         </div>
       </div>
     </div>
@@ -298,14 +283,14 @@ function simulateGeneration(prompt: string) {
         currentProject: project,
         projects,
         view: 'builder',
-        chatMessages: [{ id: 'welcome', role: 'assistant', content: `I've created your website for "${website.siteName}". You can ask me to make changes, add sections, or modify the design. What would you like to do?`, timestamp: new Date().toISOString() }],
+        chatMessages: [{ id: 'welcome', role: 'assistant', content: `I've created your website for "${website.siteName}". Ask me to make any changes — add sections, modify the design, or adjust the content.`, timestamp: new Date().toISOString() }],
         history: [{ website: JSON.parse(JSON.stringify(website)), timestamp: new Date().toISOString(), label: 'Initial generation' }],
         historyIndex: 0,
         selectedSectionId: null,
       });
       saveProject();
     }
-  }, 500);
+  }, 450);
 }
 
 // ============ BUILDER VIEW ============
@@ -314,14 +299,31 @@ function BuilderView() {
   if (!state.currentProject) return null;
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col relative">
       <TopNav />
       <BuilderToolbar />
       <div className="flex-1 flex overflow-hidden">
-        <ChatPanel />
+        {/* Desktop chat panel */}
+        <div className="hidden md:flex">
+          <ChatPanel />
+        </div>
         <PreviewPanel />
         <PropertiesPanel />
       </div>
+      {/* Mobile chat overlay */}
+      {state.showMobileChat && (
+        <div className="fixed inset-0 z-40 md:hidden bg-white flex flex-col">
+          <div className="h-11 border-b border-gray-200 flex items-center justify-between px-3">
+            <span className="text-sm font-medium">AI Chat</span>
+            <button onClick={() => setState({ showMobileChat: false })} className="p-1 hover:bg-gray-100 rounded">
+              <X size={16} />
+            </button>
+          </div>
+          <div className="flex-1 overflow-hidden">
+            <ChatPanelInner />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -329,80 +331,83 @@ function BuilderView() {
 // ============ BUILDER TOOLBAR ============
 function BuilderToolbar() {
   const state = useStore();
+
+  const savedLabel = state.lastSaved
+    ? `Saved ${getTimeAgo(state.lastSaved)}`
+    : null;
+
   return (
-    <div className="h-11 border-b border-[#e2e8f0] bg-white flex items-center justify-between px-3 shrink-0">
+    <div className="h-11 border-b border-gray-200 bg-white flex items-center justify-between px-3 shrink-0">
       <div className="flex items-center gap-1">
-        <button onClick={() => setView('dashboard')} className="p-1.5 rounded-md hover:bg-gray-100 text-[#64748b]" title="Back to Dashboard">
-          <ArrowLeft size={16} />
+        <button onClick={() => setView('dashboard')} className="p-1.5 rounded hover:bg-gray-100 text-gray-500" title="Back">
+          <ArrowLeft size={15} />
         </button>
-        <div className="w-px h-5 bg-[#e2e8f0] mx-1" />
-        <button onClick={undo} className="p-1.5 rounded-md hover:bg-gray-100 text-[#64748b]" title="Undo (Ctrl+Z)">
-          <Undo2 size={16} />
+        <div className="w-px h-4 bg-gray-200 mx-1" />
+        <button onClick={undo} className="p-1.5 rounded hover:bg-gray-100 text-gray-500" title="Undo (Ctrl+Z)">
+          <Undo2 size={15} />
         </button>
-        <button onClick={redo} className="p-1.5 rounded-md hover:bg-gray-100 text-[#64748b]" title="Redo (Ctrl+Shift+Z)">
-          <Redo2 size={16} />
+        <button onClick={redo} className="p-1.5 rounded hover:bg-gray-100 text-gray-500" title="Redo (Ctrl+Shift+Z)">
+          <Redo2 size={15} />
         </button>
-        <div className="w-px h-5 bg-[#e2e8f0] mx-1" />
-        <button onClick={saveProject} className="p-1.5 rounded-md hover:bg-gray-100 text-[#64748b]" title="Save (Ctrl+S)">
-          <Save size={16} />
+        <div className="w-px h-4 bg-gray-200 mx-1" />
+        <button onClick={() => saveProject()} className="p-1.5 rounded hover:bg-gray-100 text-gray-500" title="Save (Ctrl+S)">
+          <Save size={15} />
         </button>
-        <span className="text-xs text-[#94a3b8] ml-1 hidden sm:inline">Saved</span>
+        {savedLabel && (
+          <span className="text-[10px] text-gray-400 ml-1 hidden sm:inline">{savedLabel}</span>
+        )}
+        {/* Mobile chat toggle */}
+        <button
+          onClick={() => setState({ showMobileChat: !state.showMobileChat })}
+          className={`p-1.5 rounded text-gray-500 md:hidden ${state.showMobileChat ? 'bg-gray-100 text-black' : 'hover:bg-gray-100'}`}
+          title="AI Chat"
+        >
+          <MessageCircle size={15} />
+        </button>
       </div>
 
-      <div className="flex items-center gap-1 bg-gray-50 rounded-lg p-0.5">
+      <div className="flex items-center gap-0.5 bg-gray-100 rounded-md p-0.5">
         {(['desktop', 'tablet', 'mobile'] as ViewMode[]).map(mode => (
           <button
             key={mode}
             onClick={() => setViewMode(mode)}
-            className={`p-1.5 rounded-md transition ${state.viewMode === mode ? 'bg-white shadow-sm text-indigo-600' : 'text-[#64748b] hover:text-[#1e293b]'}`}
+            className={`p-1.5 rounded transition ${state.viewMode === mode ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
             title={mode}
           >
-            {mode === 'desktop' ? <Monitor size={15} /> : mode === 'tablet' ? <Tablet size={15} /> : <Smartphone size={15} />}
+            {mode === 'desktop' ? <Monitor size={14} /> : mode === 'tablet' ? <Tablet size={14} /> : <Smartphone size={14} />}
           </button>
         ))}
       </div>
 
       <div className="flex items-center gap-1">
-        <button
-          onClick={() => setState({ showAddSection: true })}
-          className="px-2.5 py-1 text-sm rounded-md border border-[#e2e8f0] text-[#64748b] hover:bg-gray-50 flex items-center gap-1"
-        >
-          <Plus size={14} /> <span className="hidden sm:inline">Section</span>
+        <button onClick={() => setState({ showAddSection: true })} className="px-2 py-1 text-xs rounded border border-gray-200 text-gray-600 hover:bg-gray-50 flex items-center gap-1">
+          <Plus size={12} /> <span className="hidden sm:inline">Section</span>
         </button>
-        <button
-          onClick={() => setState({ showThemePanel: true })}
-          className="px-2.5 py-1 text-sm rounded-md border border-[#e2e8f0] text-[#64748b] hover:bg-gray-50 flex items-center gap-1"
-        >
-          <Palette size={14} /> <span className="hidden sm:inline">Theme</span>
+        <button onClick={() => setState({ showThemePanel: true })} className="px-2 py-1 text-xs rounded border border-gray-200 text-gray-600 hover:bg-gray-50 flex items-center gap-1">
+          <Palette size={12} /> <span className="hidden sm:inline">Theme</span>
         </button>
         <button
           onClick={() => setState({ showCodeView: !state.showCodeView })}
-          className={`px-2.5 py-1 text-sm rounded-md border flex items-center gap-1 ${state.showCodeView ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'border-[#e2e8f0] text-[#64748b] hover:bg-gray-50'}`}
+          className={`px-2 py-1 text-xs rounded border flex items-center gap-1 ${state.showCodeView ? 'bg-gray-900 text-white border-gray-900' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
         >
-          <Code size={14} /> <span className="hidden sm:inline">Code</span>
+          <Code size={12} /> <span className="hidden sm:inline">Code</span>
+        </button>
+        <button onClick={() => setState({ showExportMenu: !state.showExportMenu })} className="px-2 py-1 text-xs rounded border border-gray-200 text-gray-600 hover:bg-gray-50 flex items-center gap-1">
+          <Download size={12} /> <span className="hidden sm:inline">Export</span>
         </button>
         <button
-          onClick={() => setState({ showExportMenu: !state.showExportMenu })}
-          className="px-2.5 py-1 text-sm rounded-md border border-[#e2e8f0] text-[#64748b] hover:bg-gray-50 flex items-center gap-1"
+          onClick={() => { setState({ isPublishing: true, publishStep: 0 }); simulatePublish(); }}
+          className="px-3 py-1 text-xs rounded bg-black text-white hover:bg-gray-800 flex items-center gap-1 font-medium"
         >
-          <Download size={14} /> <span className="hidden sm:inline">Export</span>
-        </button>
-        <button
-          onClick={() => {
-            setState({ isPublishing: true, publishStep: 0 });
-            simulatePublish();
-          }}
-          className="px-3 py-1 text-sm rounded-md bg-indigo-500 text-white hover:bg-indigo-600 flex items-center gap-1 font-medium"
-        >
-          <Rocket size={14} /> Publish
+          <Rocket size={12} /> Publish
         </button>
       </div>
     </div>
   );
 }
 
-// ============ CHAT PANEL ============
-function ChatPanel() {
+// ============ CHAT PANEL INNER ============
+function ChatPanelInner() {
   const state = useStore();
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -425,64 +430,110 @@ function ChatPanel() {
       const aiMsg: ChatMessage = { id: `msg_${Date.now() + 1}`, role: 'assistant', content: response, timestamp: new Date().toISOString() };
       updateWebsite(modified);
       pushHistory(modified, `AI: ${input}`);
+      autoSave();
       setState({ chatMessages: [...getState().chatMessages, aiMsg] });
       setIsTyping(false);
-    }, 1000);
+    }, 800);
   };
 
   return (
-    <div className="w-80 border-r border-[#e2e8f0] bg-white flex flex-col shrink-0 hidden lg:flex">
-      <div className="p-3 border-b border-[#e2e8f0] flex items-center gap-2">
-        <div className="w-7 h-7 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-          <Sparkles size={14} className="text-white" />
-        </div>
-        <div>
-          <h3 className="text-sm font-semibold text-[#1e293b]">AI Assistant</h3>
-          <p className="text-xs text-[#94a3b8]">Ask me to modify your website</p>
-        </div>
-      </div>
-      <div className="flex-1 overflow-y-auto p-3 space-y-3">
+    <div className="flex flex-col h-full">
+      <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
         {state.chatMessages.map(msg => (
-          <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}>
-            <div className={`max-w-[85%] px-3 py-2 rounded-xl text-sm ${msg.role === 'user' ? 'bg-indigo-500 text-white' : 'bg-gray-100 text-[#1e293b]'}`}>
+          <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-[85%] px-3 py-2 rounded-lg text-xs leading-relaxed ${msg.role === 'user' ? 'bg-black text-white' : 'bg-gray-100 text-gray-700'}`}>
               {msg.content}
             </div>
           </div>
         ))}
         {isTyping && (
-          <div className="flex justify-start animate-fade-in">
-            <div className="bg-gray-100 px-4 py-2 rounded-xl">
+          <div className="flex justify-start">
+            <div className="bg-gray-100 px-3 py-2 rounded-lg">
               <div className="flex gap-1">
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
             </div>
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
-      <div className="p-3 border-t border-[#e2e8f0]">
-        <div className="flex gap-2">
+      <div className="p-3 border-t border-gray-100">
+        <div className="flex gap-1.5">
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') handleSend(); }}
             placeholder="Ask AI to modify..."
-            className="flex-1 px-3 py-2 text-sm border border-[#e2e8f0] rounded-lg outline-none focus:border-indigo-300 focus:ring-1 focus:ring-indigo-100"
+            className="flex-1 px-2.5 py-1.5 text-xs border border-gray-200 rounded-md outline-none focus:border-gray-400"
           />
-          <button onClick={handleSend} disabled={!input.trim()} className="p-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 disabled:opacity-50 transition">
-            <Send size={16} />
+          <button onClick={handleSend} disabled={!input.trim()} className="p-1.5 bg-black text-white rounded-md hover:bg-gray-800 disabled:opacity-30">
+            <Send size={13} />
           </button>
         </div>
         <div className="flex flex-wrap gap-1 mt-2">
-          {['Make it dark', 'Add testimonials', 'Change to blue'].map(s => (
-            <button key={s} onClick={() => { setInput(s); }} className="text-xs px-2 py-1 bg-gray-50 border border-gray-200 rounded-full text-[#64748b] hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-600 transition">
+          {['Make it dark', 'Add testimonials', 'Change to blue', 'Make it minimal'].map(s => (
+            <button key={s} onClick={() => setInput(s)} className="text-[10px] px-2 py-0.5 bg-gray-50 border border-gray-200 rounded text-gray-500 hover:border-gray-400 hover:text-black">
               {s}
             </button>
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ============ CHAT PANEL (Desktop sidebar) ============
+function ChatPanel() {
+  const state = useStore();
+  return (
+    <div className="w-72 border-r border-gray-200 bg-white flex flex-col shrink-0">
+      <div className="p-3 border-b border-gray-100 flex items-center gap-2">
+        <div className="w-6 h-6 bg-black rounded flex items-center justify-center">
+          <Sparkles size={12} className="text-white" />
+        </div>
+        <div>
+          <h3 className="text-xs font-medium text-black">AI Assistant</h3>
+          <p className="text-[10px] text-gray-400">Ask to modify your site</p>
+        </div>
+      </div>
+      <ChatPanelInner />
+    </div>
+  );
+}
+
+// ============ SORTABLE SECTION WRAPPER ============
+function SortableSection({ section, theme, isSelected, onSelect }: {
+  section: Section;
+  theme: any;
+  isSelected: boolean;
+  onSelect: (id: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: section.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    position: 'relative' as const,
+    zIndex: isDragging ? 50 : 'auto' as any,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes}>
+      {/* Drag handle overlay */}
+      <div
+        className="absolute left-0 top-0 bottom-0 w-6 z-40 cursor-grab active:cursor-grabbing flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-black/5"
+        {...listeners}
+      >
+        <GripVertical size={12} className="text-gray-400" />
+      </div>
+      <SectionRenderer
+        section={section}
+        theme={theme}
+        isSelected={isSelected}
+        onSelect={onSelect}
+      />
     </div>
   );
 }
@@ -496,32 +547,54 @@ function PreviewPanel() {
     return <CodeViewPanel />;
   }
 
-  const widthClass = state.viewMode === 'desktop' ? 'w-full' : state.viewMode === 'tablet' ? 'max-w-[768px]' : 'max-w-[375px]';
+  const widthClass = state.viewMode === 'desktop' ? 'preview-desktop' : state.viewMode === 'tablet' ? 'preview-tablet' : 'preview-mobile';
+  const sections = state.currentProject.website.sections;
+  const theme = state.currentProject.website.themeSettings;
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const website = JSON.parse(JSON.stringify(state.currentProject!.website)) as WebsiteConfig;
+    const oldIndex = website.sections.findIndex(s => s.id === active.id);
+    const newIndex = website.sections.findIndex(s => s.id === over.id);
+    website.sections = arrayMove(website.sections, oldIndex, newIndex);
+    updateWebsite(website);
+    pushHistory(website, 'Reorder sections');
+  };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-[#f1f5f9]">
+    <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
       <div className="flex-1 overflow-auto p-4">
-        <div className={`${widthClass} mx-auto bg-white rounded-lg shadow-sm border border-[#e2e8f0] overflow-hidden transition-all duration-300`}>
-          <div className="h-8 bg-gray-50 border-b border-[#e2e8f0] flex items-center px-3 gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
-            <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
-            <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
-            <div className="flex-1 mx-4">
-              <div className="bg-white border border-gray-200 rounded px-3 py-0.5 text-xs text-[#94a3b8] text-center max-w-md mx-auto">
+        <div className={`${widthClass} mx-auto bg-white rounded-lg border border-gray-200 overflow-hidden transition-all duration-300`}>
+          {/* Browser chrome */}
+          <div className="h-7 bg-gray-50 border-b border-gray-200 flex items-center px-2.5 gap-1">
+            <div className="flex gap-1">
+              <div className="w-2 h-2 rounded-full bg-gray-300" />
+              <div className="w-2 h-2 rounded-full bg-gray-300" />
+              <div className="w-2 h-2 rounded-full bg-gray-300" />
+            </div>
+            <div className="flex-1 mx-3">
+              <div className="bg-white border border-gray-200 rounded px-2 py-0.5 text-[10px] text-gray-400 text-center max-w-xs mx-auto truncate">
                 {state.currentProject.website.seo.canonicalUrl || 'localhost:3000'}
               </div>
             </div>
           </div>
-          <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
-            {state.currentProject.website.sections.map(section => (
-              <SectionRenderer
-                key={section.id}
-                section={section}
-                theme={state.currentProject!.website.themeSettings}
-                isSelected={state.selectedSectionId === section.id}
-                onSelect={(id) => selectSection(state.selectedSectionId === id ? null : id)}
-              />
-            ))}
+          {/* Website content with drag-and-drop */}
+          <div className="overflow-auto relative" style={{ maxHeight: 'calc(100vh - 180px)' }}>
+            <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={sections.map(s => s.id)} strategy={verticalListSortingStrategy}>
+                {sections.map(section => (
+                  <SortableSection
+                    key={section.id}
+                    section={section}
+                    theme={theme}
+                    isSelected={state.selectedSectionId === section.id}
+                    onSelect={(id) => selectSection(state.selectedSectionId === id ? null : id)}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
           </div>
         </div>
       </div>
@@ -540,27 +613,27 @@ function CodeViewPanel() {
       JSON.stringify(state.currentProject.website, null, 2);
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-[#1e1e2e]">
-      <div className="flex items-center gap-1 px-3 py-2 border-b border-[#2d2d3f]">
+    <div className="flex-1 flex flex-col overflow-hidden bg-gray-900">
+      <div className="flex items-center gap-1 px-3 py-1.5 border-b border-gray-800">
         {(['html', 'react', 'json'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-3 py-1 text-xs rounded font-medium transition ${activeTab === tab ? 'bg-[#2d2d3f] text-indigo-400' : 'text-gray-400 hover:text-gray-200'}`}
+            className={`px-2.5 py-1 text-[11px] rounded font-medium transition ${activeTab === tab ? 'bg-gray-800 text-white' : 'text-gray-500 hover:text-gray-300'}`}
           >
             {tab.toUpperCase()}
           </button>
         ))}
         <div className="flex-1" />
-        <button onClick={() => { navigator.clipboard.writeText(code); addToast('Code copied!', 'success'); }} className="px-2 py-1 text-xs text-gray-400 hover:text-white flex items-center gap-1">
-          <Copy size={12} /> Copy
+        <button onClick={() => { navigator.clipboard.writeText(code); addToast('Copied!', 'success'); }} className="px-2 py-1 text-[11px] text-gray-500 hover:text-white flex items-center gap-1">
+          <Copy size={11} /> Copy
         </button>
-        <button onClick={() => downloadHTML(state.currentProject!.website)} className="px-2 py-1 text-xs text-gray-400 hover:text-white flex items-center gap-1">
-          <Download size={12} /> Download
+        <button onClick={() => downloadHTML(state.currentProject!.website)} className="px-2 py-1 text-[11px] text-gray-500 hover:text-white flex items-center gap-1">
+          <Download size={11} /> Download
         </button>
       </div>
       <div className="flex-1 overflow-auto p-4">
-        <pre className="code-view text-gray-300 whitespace-pre-wrap">{code}</pre>
+        <pre className="code-block text-gray-300 whitespace-pre-wrap">{code}</pre>
       </div>
     </div>
   );
@@ -569,36 +642,44 @@ function CodeViewPanel() {
 // ============ PROPERTIES PANEL ============
 function PropertiesPanel() {
   const state = useStore();
-  const [mobileTab, setMobileTab] = useState<'chat' | 'properties'>('properties');
-
   if (!state.currentProject) return null;
   const selectedSection = state.currentProject.website.sections.find(s => s.id === state.selectedSectionId);
 
   return (
-    <>
-      {/* Desktop properties panel */}
-      <div className="w-72 border-l border-[#e2e8f0] bg-white flex flex-col shrink-0 hidden xl:flex">
-        {selectedSection ? (
-          <SectionEditor section={selectedSection} />
-        ) : (
-          <div className="p-4 text-center text-[#94a3b8]">
-            <Layers size={32} className="mx-auto mb-3 opacity-50" />
-            <p className="text-sm font-medium">Select a section</p>
-            <p className="text-xs mt-1">Click on any section in the preview to edit its properties.</p>
+    <div className="w-64 border-l border-gray-200 bg-white flex flex-col shrink-0 hidden md:flex">
+      {selectedSection ? (
+        <SectionEditor section={selectedSection} />
+      ) : (
+        <div className="flex flex-col h-full">
+          {/* Section List */}
+          <div className="p-3 border-b border-gray-100">
+            <h3 className="text-xs font-medium text-black mb-1">Sections</h3>
+            <p className="text-[10px] text-gray-400">Click to select, drag to reorder</p>
           </div>
-        )}
-      </div>
-
-      {/* Mobile tab bar */}
-      <div className="xl:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-[#e2e8f0] flex z-40">
-        <button onClick={() => setMobileTab('chat')} className={`flex-1 py-3 text-xs font-medium flex items-center justify-center gap-1 ${mobileTab === 'chat' ? 'text-indigo-600 bg-indigo-50' : 'text-[#64748b]'}`}>
-          <Sparkles size={14} /> Chat
-        </button>
-        <button onClick={() => setMobileTab('properties')} className={`flex-1 py-3 text-xs font-medium flex items-center justify-center gap-1 ${mobileTab === 'properties' ? 'text-indigo-600 bg-indigo-50' : 'text-[#64748b]'}`}>
-          <Settings size={14} /> Edit
-        </button>
-      </div>
-    </>
+          <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+            {state.currentProject.website.sections.map((section, index) => (
+              <button
+                key={section.id}
+                onClick={() => selectSection(section.id)}
+                className="w-full text-left px-2.5 py-2 rounded text-xs hover:bg-gray-50 flex items-center gap-2 transition"
+              >
+                <GripVertical size={10} className="text-gray-300 shrink-0" />
+                <span className="capitalize text-gray-700 truncate">{section.type.replace('-', ' ')}</span>
+                <span className="text-[10px] text-gray-300 ml-auto">{index + 1}</span>
+              </button>
+            ))}
+          </div>
+          <div className="p-2 border-t border-gray-100">
+            <button
+              onClick={() => setState({ showAddSection: true })}
+              className="w-full py-1.5 text-xs text-gray-500 hover:text-black hover:bg-gray-50 rounded flex items-center justify-center gap-1 transition"
+            >
+              <Plus size={12} /> Add Section
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -610,11 +691,31 @@ function SectionEditor({ section }: { section: Section }) {
   const updateConfig = (key: string, value: any) => {
     const website = JSON.parse(JSON.stringify(state.currentProject!.website)) as WebsiteConfig;
     const sec = website.sections.find(s => s.id === section.id);
-    if (sec) {
+    if (!sec) return;
+
+    // Handle nested array paths like "features[0].title"
+    const arrayMatch = key.match(/^(\w+)\[(\d+)\]\.(\w+)$/);
+    if (arrayMatch) {
+      const [, arrayKey, indexStr, fieldKey] = arrayMatch;
+      const index = parseInt(indexStr, 10);
+      if (Array.isArray(sec.config[arrayKey]) && sec.config[arrayKey][index]) {
+        // Handle comma-separated links
+        if (arrayKey === 'links') {
+          sec.config[arrayKey] = value.split(',').map((s: string) => s.trim());
+        } else {
+          sec.config[arrayKey][index][fieldKey] = value;
+        }
+      }
+    } else if (key === 'links' && typeof value === 'string') {
+      // Handle comma-separated nav links
+      sec.config[key] = value.split(',').map((s: string) => s.trim());
+    } else {
       sec.config[key] = value;
-      updateWebsite(website);
-      pushHistory(website, `Edit ${section.type}: ${key}`);
     }
+
+    updateWebsite(website);
+    pushHistory(website, `Edit ${section.type}: ${key}`);
+    autoSave();
   };
 
   const moveSection = (direction: 'up' | 'down') => {
@@ -627,6 +728,7 @@ function SectionEditor({ section }: { section: Section }) {
     }
     updateWebsite(website);
     pushHistory(website, `Move ${section.type}`);
+    autoSave();
   };
 
   const deleteSection = () => {
@@ -635,6 +737,7 @@ function SectionEditor({ section }: { section: Section }) {
     updateWebsite(website);
     selectSection(null);
     pushHistory(website, `Delete ${section.type}`);
+    autoSave();
     addToast('Section deleted', 'info');
   };
 
@@ -645,75 +748,68 @@ function SectionEditor({ section }: { section: Section }) {
     website.sections.splice(idx + 1, 0, clone);
     updateWebsite(website);
     pushHistory(website, `Duplicate ${section.type}`);
-    addToast('Section duplicated', 'success');
+    autoSave();
+    addToast('Duplicated', 'success');
   };
 
   const editableFields = getEditableFields(section);
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-3 border-b border-[#e2e8f0] flex items-center justify-between">
+      <div className="p-3 border-b border-gray-100 flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-[#1e293b] capitalize">{section.type.replace('-', ' ')} Section</h3>
-          <p className="text-xs text-[#94a3b8]">Edit properties</p>
+          <h3 className="text-xs font-medium text-black capitalize">{section.type.replace('-', ' ')}</h3>
+          <p className="text-[10px] text-gray-400">Edit properties</p>
         </div>
         <button onClick={() => selectSection(null)} className="p-1 hover:bg-gray-100 rounded">
-          <X size={14} className="text-[#64748b]" />
+          <X size={12} className="text-gray-400" />
         </button>
       </div>
-      <div className="flex-1 overflow-y-auto p-3 space-y-3">
+      <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
         {editableFields.map(field => (
           <div key={field.key}>
-            <label className="text-xs font-medium text-[#64748b] mb-1 block">{field.label}</label>
+            <label className="text-[10px] font-medium text-gray-500 mb-0.5 block uppercase tracking-wide">{field.label}</label>
             {field.type === 'text' && (
               <input
                 type="text"
                 value={field.value || ''}
                 onChange={(e) => updateConfig(field.key, e.target.value)}
-                className="w-full px-2.5 py-1.5 text-sm border border-[#e2e8f0] rounded-md outline-none focus:border-indigo-300"
+                className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded outline-none focus:border-gray-400"
               />
             )}
             {field.type === 'textarea' && (
               <textarea
                 value={field.value || ''}
                 onChange={(e) => updateConfig(field.key, e.target.value)}
-                rows={3}
-                className="w-full px-2.5 py-1.5 text-sm border border-[#e2e8f0] rounded-md outline-none focus:border-indigo-300 resize-none"
+                rows={2}
+                className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded outline-none focus:border-gray-400 resize-none"
               />
             )}
             {field.type === 'select' && (
               <select
                 value={field.value || ''}
                 onChange={(e) => updateConfig(field.key, e.target.value)}
-                className="w-full px-2.5 py-1.5 text-sm border border-[#e2e8f0] rounded-md outline-none focus:border-indigo-300"
+                className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded outline-none focus:border-gray-400"
               >
                 {field.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
               </select>
             )}
-            {field.type === 'color' && (
-              <input
-                type="color"
-                value={field.value || '#000000'}
-                onChange={(e) => updateConfig(field.key, e.target.value)}
-                className="w-full h-8 border border-[#e2e8f0] rounded-md cursor-pointer"
-              />
-            )}
           </div>
         ))}
       </div>
-      <div className="p-3 border-t border-[#e2e8f0] space-y-1.5">
+      <div className="p-2.5 border-t border-gray-100">
         <div className="grid grid-cols-4 gap-1">
-          <button onClick={() => moveSection('up')} className="p-1.5 border border-[#e2e8f0] rounded hover:bg-gray-50 flex items-center justify-center" title="Move Up">
-            <ChevronUp size={14} />
+          <button onClick={() => moveSection('up')} className="p-1.5 border border-gray-200 rounded hover:bg-gray-50 flex items-center justify-center" title="Move Up">
+            <ChevronUp size={12} />
           </button>
-          <button onClick={() => moveSection('down')} className="p-1.5 border border-[#e2e8f0] rounded hover:bg-gray-50 flex items-center justify-center" title="Move Down">
-            <ChevronDown size={14} />
+          <button onClick={() => moveSection('down')} className="p-1.5 border border-gray-200 rounded hover:bg-gray-50 flex items-center justify-center" title="Move Down">
+            <ChevronDown size={12} />
           </button>
-          <button onClick={duplicateSection} className="p-1.5 border border-[#e2e8f0] rounded hover:bg-gray-50 flex items-center justify-center" title="Duplicate">
-            <Copy size={14} />
+          <button onClick={duplicateSection} className="p-1.5 border border-gray-200 rounded hover:bg-gray-50 flex items-center justify-center" title="Duplicate">
+            <Copy size={12} />
           </button>
           <button onClick={deleteSection} className="p-1.5 border border-red-200 rounded hover:bg-red-50 flex items-center justify-center text-red-500" title="Delete">
-            <Trash2 size={14} />
+            <Trash2 size={12} />
           </button>
         </div>
       </div>
@@ -725,22 +821,96 @@ function getEditableFields(section: Section): { key: string; label: string; type
   const fields: { key: string; label: string; type: string; value: any; options?: string[] }[] = [];
   const c = section.config;
 
+  // Top-level text fields
   if (c.title) fields.push({ key: 'title', label: 'Title', type: 'text', value: c.title });
   if (c.subtitle) fields.push({ key: 'subtitle', label: 'Subtitle', type: 'textarea', value: c.subtitle });
   if (c.description) fields.push({ key: 'description', label: 'Description', type: 'textarea', value: c.description });
   if (c.buttonText) fields.push({ key: 'buttonText', label: 'Button Text', type: 'text', value: c.buttonText });
   if (c.secondaryButtonText) fields.push({ key: 'secondaryButtonText', label: 'Secondary Button', type: 'text', value: c.secondaryButtonText });
+  if (c.placeholder) fields.push({ key: 'placeholder', label: 'Placeholder', type: 'text', value: c.placeholder });
+
+  // Select fields
   if (c.alignment) fields.push({ key: 'alignment', label: 'Alignment', type: 'select', value: c.alignment, options: ['left', 'center', 'right'] });
   if (c.backgroundStyle) fields.push({ key: 'backgroundStyle', label: 'Background', type: 'select', value: c.backgroundStyle, options: ['light', 'dark', 'gradient'] });
+
+  // Brand / contact
   if (c.brandName) fields.push({ key: 'brandName', label: 'Brand Name', type: 'text', value: c.brandName });
+  if (c.ctaText) fields.push({ key: 'ctaText', label: 'CTA Text', type: 'text', value: c.ctaText });
   if (c.email) fields.push({ key: 'email', label: 'Email', type: 'text', value: c.email });
   if (c.phone) fields.push({ key: 'phone', label: 'Phone', type: 'text', value: c.phone });
-  if (c.address) fields.push({ key: 'address', label: 'Address', type: 'text', value: c.address });
+  if (c.address) fields.push({ key: 'address', label: 'Address', type: 'textarea', value: c.address });
 
-  if (fields.length === 0) {
-    fields.push({ key: 'title', label: 'Title', type: 'text', value: c.title || section.type });
+  // Array items - features
+  if (Array.isArray(c.features) && c.features.length > 0) {
+    c.features.forEach((f: any, i: number) => {
+      fields.push({ key: `features[${i}].title`, label: `Feature ${i + 1} Title`, type: 'text', value: f.title });
+      fields.push({ key: `features[${i}].description`, label: `Feature ${i + 1} Desc`, type: 'textarea', value: f.description });
+    });
   }
 
+  // Array items - services
+  if (Array.isArray(c.services) && c.services.length > 0) {
+    c.services.forEach((s: any, i: number) => {
+      fields.push({ key: `services[${i}].title`, label: `Service ${i + 1} Title`, type: 'text', value: s.title });
+      fields.push({ key: `services[${i}].description`, label: `Service ${i + 1} Desc`, type: 'textarea', value: s.description });
+    });
+  }
+
+  // Array items - products
+  if (Array.isArray(c.products) && c.products.length > 0) {
+    c.products.forEach((p: any, i: number) => {
+      fields.push({ key: `products[${i}].name`, label: `Product ${i + 1} Name`, type: 'text', value: p.name });
+      fields.push({ key: `products[${i}].price`, label: `Product ${i + 1} Price`, type: 'text', value: p.price });
+    });
+  }
+
+  // Array items - testimonials
+  if (Array.isArray(c.testimonials) && c.testimonials.length > 0) {
+    c.testimonials.forEach((t: any, i: number) => {
+      fields.push({ key: `testimonials[${i}].name`, label: `Testimonial ${i + 1} Name`, type: 'text', value: t.name });
+      fields.push({ key: `testimonials[${i}].role`, label: `Testimonial ${i + 1} Role`, type: 'text', value: t.role });
+      fields.push({ key: `testimonials[${i}].content`, label: `Testimonial ${i + 1} Text`, type: 'textarea', value: t.content });
+    });
+  }
+
+  // Array items - team members
+  if (Array.isArray(c.members) && c.members.length > 0) {
+    c.members.forEach((m: any, i: number) => {
+      fields.push({ key: `members[${i}].name`, label: `Member ${i + 1} Name`, type: 'text', value: m.name });
+      fields.push({ key: `members[${i}].role`, label: `Member ${i + 1} Role`, type: 'text', value: m.role });
+    });
+  }
+
+  // Array items - FAQ questions
+  if (Array.isArray(c.questions) && c.questions.length > 0) {
+    c.questions.forEach((q: any, i: number) => {
+      fields.push({ key: `questions[${i}].question`, label: `FAQ ${i + 1} Q`, type: 'text', value: q.question });
+      fields.push({ key: `questions[${i}].answer`, label: `FAQ ${i + 1} A`, type: 'textarea', value: q.answer });
+    });
+  }
+
+  // Array items - stats
+  if (Array.isArray(c.stats) && c.stats.length > 0) {
+    c.stats.forEach((s: any, i: number) => {
+      fields.push({ key: `stats[${i}].value`, label: `Stat ${i + 1} Value`, type: 'text', value: s.value });
+      fields.push({ key: `stats[${i}].label`, label: `Stat ${i + 1} Label`, type: 'text', value: s.label });
+    });
+  }
+
+  // Array items - pricing plans
+  if (Array.isArray(c.plans) && c.plans.length > 0) {
+    c.plans.forEach((p: any, i: number) => {
+      fields.push({ key: `plans[${i}].name`, label: `Plan ${i + 1} Name`, type: 'text', value: p.name });
+      fields.push({ key: `plans[${i}].price`, label: `Plan ${i + 1} Price`, type: 'text', value: p.price });
+    });
+  }
+
+  // Navbar links
+  if (Array.isArray(c.links) && c.links.length > 0 && typeof c.links[0] === 'string') {
+    fields.push({ key: 'links', label: 'Nav Links (comma-separated)', type: 'text', value: c.links.join(', ') });
+  }
+
+  if (fields.length === 0) fields.push({ key: 'title', label: 'Title', type: 'text', value: c.title || section.type });
   return fields;
 }
 
@@ -754,76 +924,71 @@ function DashboardView() {
     <div className="h-full flex flex-col">
       <TopNav />
       <main className="flex-1 overflow-auto">
-        <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="max-w-5xl mx-auto px-4 py-8">
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h1 className="text-2xl font-bold text-[#1e293b]">My Projects</h1>
-              <p className="text-[#64748b] text-sm mt-1">Manage your websites</p>
+              <h1 className="text-xl font-semibold text-black">Projects</h1>
+              <p className="text-sm text-gray-500 mt-0.5">Your websites</p>
             </div>
-            <button onClick={() => setView('landing')} className="btn-primary flex items-center gap-2">
-              <Plus size={16} /> New Website
+            <button onClick={() => setView('landing')} className="px-3 py-1.5 bg-black text-white text-xs font-medium rounded-md hover:bg-gray-800 flex items-center gap-1.5">
+              <Plus size={13} /> New
             </button>
           </div>
 
           {state.projects.length === 0 ? (
             <div className="text-center py-20">
-              <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <FolderOpen size={28} className="text-[#94a3b8]" />
+              <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+                <FolderOpen size={22} className="text-gray-400" />
               </div>
-              <h3 className="text-lg font-semibold text-[#1e293b] mb-2">No projects yet</h3>
-              <p className="text-[#64748b] mb-6">Create your first website with AI</p>
-              <button onClick={() => setView('landing')} className="btn-primary">
+              <h3 className="text-sm font-medium text-black mb-1">No projects yet</h3>
+              <p className="text-xs text-gray-500 mb-4">Create your first website with AI</p>
+              <button onClick={() => setView('landing')} className="px-4 py-2 bg-black text-white text-xs font-medium rounded-md hover:bg-gray-800">
                 Create Website
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {state.projects.map(project => (
-                <div key={project.id} className="bg-white rounded-xl border border-[#e2e8f0] overflow-hidden card-hover group">
-                  <div className="h-36 bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center relative">
-                    <span className="text-4xl">{project.website.industry === 'Restaurant' ? '🍽️' : project.website.industry === 'SaaS' ? '🚀' : project.website.industry === 'E-commerce' ? '🛍️' : project.website.industry === 'Portfolio' ? '💻' : project.website.industry === 'Fashion' ? '👠' : '🌐'}</span>
-                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition">
-                      <div className="flex gap-1">
-                        <button onClick={() => { setEditingId(project.id); setEditName(project.name); }} className="p-1.5 bg-white rounded-md shadow-sm hover:bg-gray-50">
-                          <Edit3 size={12} />
-                        </button>
-                        <button onClick={() => duplicateProject(project.id)} className="p-1.5 bg-white rounded-md shadow-sm hover:bg-gray-50">
-                          <Copy size={12} />
-                        </button>
-                        <button onClick={() => deleteProject(project.id)} className="p-1.5 bg-white rounded-md shadow-sm hover:bg-red-50 text-red-500">
-                          <Trash2 size={12} />
-                        </button>
-                      </div>
+                <div key={project.id} className="border border-gray-200 rounded-lg overflow-hidden hover:border-gray-300 transition group">
+                  <div className="h-28 bg-gray-50 flex items-center justify-center relative">
+                    <span className="text-3xl">{project.website.industry === 'Restaurant' ? '🍽️' : project.website.industry === 'SaaS' ? '🚀' : project.website.industry === 'E-commerce' ? '🛍️' : project.website.industry === 'Portfolio' ? '💻' : project.website.industry === 'Fashion' ? '👠' : '🌐'}</span>
+                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition flex gap-1">
+                      <button onClick={() => { setEditingId(project.id); setEditName(project.name); }} className="p-1 bg-white rounded shadow-sm hover:bg-gray-50">
+                        <Edit3 size={10} />
+                      </button>
+                      <button onClick={() => duplicateProject(project.id)} className="p-1 bg-white rounded shadow-sm hover:bg-gray-50">
+                        <Copy size={10} />
+                      </button>
+                      <button onClick={() => deleteProject(project.id)} className="p-1 bg-white rounded shadow-sm hover:bg-red-50 text-red-500">
+                        <Trash2 size={10} />
+                      </button>
                     </div>
                     {project.status === 'published' && (
-                      <span className="absolute top-2 left-2 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-medium">Published</span>
+                      <span className="absolute top-2 left-2 px-1.5 py-0.5 bg-green-100 text-green-700 text-[10px] rounded font-medium">Live</span>
                     )}
                   </div>
-                  <div className="p-4">
+                  <div className="p-3">
                     {editingId === project.id ? (
                       <input
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
                         onBlur={() => { renameProject(project.id, editName); setEditingId(null); }}
                         onKeyDown={(e) => { if (e.key === 'Enter') { renameProject(project.id, editName); setEditingId(null); } }}
-                        className="font-semibold text-[#1e293b] border-b border-indigo-300 outline-none w-full mb-1"
+                        className="text-sm font-medium border-b border-black outline-none w-full mb-1"
                         autoFocus
                       />
                     ) : (
-                      <h3 className="font-semibold text-[#1e293b] mb-1 truncate">{project.name}</h3>
+                      <h3 className="text-sm font-medium text-black mb-0.5 truncate">{project.name}</h3>
                     )}
-                    <p className="text-xs text-[#94a3b8] flex items-center gap-1">
-                      <Clock size={10} />
+                    <p className="text-[10px] text-gray-400 flex items-center gap-1">
+                      <Clock size={9} />
                       {new Date(project.updatedAt).toLocaleDateString()}
                     </p>
                     <button
-                      onClick={() => {
-                        setState({ currentProject: project, view: 'builder', selectedSectionId: null });
-                        saveProject();
-                      }}
-                      className="mt-3 w-full py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition flex items-center justify-center gap-1"
+                      onClick={() => { setState({ currentProject: project, view: 'builder', selectedSectionId: null }); saveProject(); }}
+                      className="mt-2 w-full py-1.5 text-xs font-medium text-black bg-gray-100 rounded hover:bg-gray-200 transition"
                     >
-                      <Eye size={14} /> Open
+                      Open
                     </button>
                   </div>
                 </div>
@@ -846,34 +1011,34 @@ function TemplatesView() {
     <div className="h-full flex flex-col">
       <TopNav />
       <main className="flex-1 overflow-auto">
-        <div className="max-w-6xl mx-auto px-4 py-8">
-          <h1 className="text-2xl font-bold text-[#1e293b] mb-2">Templates</h1>
-          <p className="text-[#64748b] text-sm mb-6">Start with a professionally designed template</p>
+        <div className="max-w-5xl mx-auto px-4 py-8">
+          <h1 className="text-xl font-semibold text-black mb-1">Templates</h1>
+          <p className="text-sm text-gray-500 mb-5">Start with a pre-built design</p>
 
-          <div className="flex gap-2 mb-6 flex-wrap">
+          <div className="flex gap-1.5 mb-5 flex-wrap">
             {categories.map(cat => (
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-3 py-1.5 text-sm rounded-full font-medium transition ${selectedCategory === cat ? 'bg-indigo-500 text-white' : 'bg-white border border-[#e2e8f0] text-[#64748b] hover:border-indigo-300'}`}
+                className={`px-2.5 py-1 text-xs rounded-full font-medium transition ${selectedCategory === cat ? 'bg-black text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
               >
                 {cat}
               </button>
             ))}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {filtered.map(template => (
-              <div key={template.id} className="bg-white rounded-xl border border-[#e2e8f0] overflow-hidden card-hover">
-                <div className="h-40 bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center">
-                  <span className="text-5xl">{template.preview}</span>
+              <div key={template.id} className="border border-gray-200 rounded-lg overflow-hidden hover:border-gray-300 transition">
+                <div className="h-32 bg-gray-50 flex items-center justify-center">
+                  <span className="text-4xl">{template.preview}</span>
                 </div>
-                <div className="p-4">
+                <div className="p-3">
                   <div className="flex items-center justify-between mb-1">
-                    <h3 className="font-semibold text-[#1e293b]">{template.name}</h3>
-                    <span className="text-xs px-2 py-0.5 bg-gray-100 rounded-full text-[#64748b]">{template.category}</span>
+                    <h3 className="text-sm font-medium text-black">{template.name}</h3>
+                    <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 rounded text-gray-500">{template.category}</span>
                   </div>
-                  <p className="text-sm text-[#64748b] mb-3">{template.description}</p>
+                  <p className="text-xs text-gray-500 mb-2.5 line-clamp-2">{template.description}</p>
                   <button
                     onClick={() => {
                       setView('landing');
@@ -882,7 +1047,7 @@ function TemplatesView() {
                         simulateGeneration(template.prompt);
                       }, 100);
                     }}
-                    className="w-full py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition"
+                    className="w-full py-1.5 text-xs font-medium text-black bg-gray-100 rounded hover:bg-gray-200 transition"
                   >
                     Use Template
                   </button>
@@ -902,42 +1067,30 @@ function PricingView() {
     <div className="h-full flex flex-col">
       <TopNav />
       <main className="flex-1 overflow-auto">
-        <div className="max-w-5xl mx-auto px-4 py-12">
-          <div className="text-center mb-12">
-            <h1 className="text-3xl font-bold text-[#1e293b] mb-3">Simple, transparent pricing</h1>
-            <p className="text-[#64748b] text-lg">Choose the plan that's right for you</p>
+        <div className="max-w-4xl mx-auto px-4 py-12">
+          <div className="text-center mb-10">
+            <h1 className="text-2xl font-semibold text-black mb-2">Pricing</h1>
+            <p className="text-sm text-gray-500">Simple plans for everyone</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[
-              {
-                name: 'Free', price: '$0', period: '/month',
-                features: ['3 projects', 'AI generation', 'Basic templates', 'Community support', 'SiteForge branding'],
-                cta: 'Get Started', highlighted: false,
-              },
-              {
-                name: 'Pro', price: '$19', period: '/month',
-                features: ['Unlimited projects', 'Advanced AI editing', 'Custom domains', 'Code export', 'Priority support', 'No branding', 'Analytics'],
-                cta: 'Start Pro Trial', highlighted: true,
-              },
-              {
-                name: 'Business', price: '$49', period: '/month',
-                features: ['Everything in Pro', 'Team collaboration', 'Advanced publishing', 'Priority generation', 'API access', 'Custom integrations', 'Dedicated support'],
-                cta: 'Contact Sales', highlighted: false,
-              },
+              { name: 'Free', price: '$0', period: '/mo', features: ['3 projects', 'AI generation', 'Basic templates', 'Community support'], cta: 'Get Started', highlighted: false },
+              { name: 'Pro', price: '$19', period: '/mo', features: ['Unlimited projects', 'Advanced AI', 'Custom domains', 'Code export', 'Priority support'], cta: 'Start Pro Trial', highlighted: true },
+              { name: 'Business', price: '$49', period: '/mo', features: ['Everything in Pro', 'Team collaboration', 'Advanced publishing', 'API access', 'Dedicated support'], cta: 'Contact Sales', highlighted: false },
             ].map((plan, i) => (
-              <div key={i} className={`rounded-xl p-6 ${plan.highlighted ? 'bg-gradient-to-b from-indigo-500 to-purple-600 text-white shadow-xl shadow-indigo-200 scale-105' : 'bg-white border border-[#e2e8f0]'}`}>
-                {plan.highlighted && <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full mb-3 inline-block">Most Popular</span>}
-                <h3 className={`text-lg font-semibold mb-1 ${plan.highlighted ? 'text-white' : 'text-[#1e293b]'}`}>{plan.name}</h3>
-                <div className={`text-3xl font-bold mb-4 ${plan.highlighted ? 'text-white' : 'text-[#1e293b]'}`}>{plan.price}<span className={`text-sm font-normal ${plan.highlighted ? 'text-white/70' : 'text-[#94a3b8]'}`}>{plan.period}</span></div>
-                <ul className="space-y-2 mb-6">
+              <div key={i} className={`rounded-lg p-5 ${plan.highlighted ? 'bg-black text-white' : 'border border-gray-200'}`}>
+                {plan.highlighted && <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full mb-2 inline-block font-medium">Popular</span>}
+                <h3 className={`text-sm font-medium mb-1 ${plan.highlighted ? 'text-white' : 'text-black'}`}>{plan.name}</h3>
+                <div className={`text-2xl font-bold mb-3 ${plan.highlighted ? 'text-white' : 'text-black'}`}>{plan.price}<span className={`text-xs font-normal ${plan.highlighted ? 'text-white/60' : 'text-gray-400'}`}>{plan.period}</span></div>
+                <ul className="space-y-1.5 mb-5">
                   {plan.features.map((f, j) => (
-                    <li key={j} className={`flex items-center gap-2 text-sm ${plan.highlighted ? 'text-white/90' : 'text-[#64748b]'}`}>
-                      <Check size={14} className={plan.highlighted ? 'text-white' : 'text-green-500'} /> {f}
+                    <li key={j} className={`flex items-center gap-1.5 text-xs ${plan.highlighted ? 'text-white/80' : 'text-gray-600'}`}>
+                      <Check size={12} className={plan.highlighted ? 'text-white' : 'text-green-500'} /> {f}
                     </li>
                   ))}
                 </ul>
-                <button className={`w-full py-2.5 rounded-lg font-medium text-sm transition ${plan.highlighted ? 'bg-white text-indigo-600 hover:bg-gray-100' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'}`}>
+                <button className={`w-full py-2 rounded text-xs font-medium transition ${plan.highlighted ? 'bg-white text-black hover:bg-gray-100' : 'bg-gray-100 text-black hover:bg-gray-200'}`}>
                   {plan.cta}
                 </button>
               </div>
@@ -955,53 +1108,39 @@ function AddSectionModal() {
   if (!state.showAddSection || !state.currentProject) return null;
 
   const sectionTypes: { type: SectionType; label: string; icon: string }[] = [
-    { type: 'hero', label: 'Hero', icon: '🏔️' },
-    { type: 'features', label: 'Features', icon: '⭐' },
-    { type: 'about', label: 'About', icon: 'ℹ️' },
-    { type: 'services', label: 'Services', icon: '🔧' },
-    { type: 'products', label: 'Products', icon: '🛍️' },
-    { type: 'pricing', label: 'Pricing', icon: '💰' },
-    { type: 'testimonials', label: 'Testimonials', icon: '💬' },
-    { type: 'gallery', label: 'Gallery', icon: '🖼️' },
-    { type: 'team', label: 'Team', icon: '👥' },
-    { type: 'faq', label: 'FAQ', icon: '❓' },
-    { type: 'stats', label: 'Stats', icon: '📊' },
-    { type: 'cta', label: 'CTA', icon: '📢' },
-    { type: 'contact', label: 'Contact', icon: '📧' },
-    { type: 'newsletter', label: 'Newsletter', icon: '📰' },
+    { type: 'hero', label: 'Hero', icon: '🏔️' }, { type: 'features', label: 'Features', icon: '⭐' },
+    { type: 'about', label: 'About', icon: 'ℹ️' }, { type: 'services', label: 'Services', icon: '🔧' },
+    { type: 'products', label: 'Products', icon: '🛍️' }, { type: 'pricing', label: 'Pricing', icon: '💰' },
+    { type: 'testimonials', label: 'Testimonials', icon: '💬' }, { type: 'gallery', label: 'Gallery', icon: '🖼️' },
+    { type: 'team', label: 'Team', icon: '👥' }, { type: 'faq', label: 'FAQ', icon: '❓' },
+    { type: 'stats', label: 'Stats', icon: '📊' }, { type: 'cta', label: 'CTA', icon: '📢' },
+    { type: 'contact', label: 'Contact', icon: '📧' }, { type: 'newsletter', label: 'Newsletter', icon: '📰' },
   ];
 
   const addSection = (type: SectionType) => {
     const website = JSON.parse(JSON.stringify(state.currentProject!.website)) as WebsiteConfig;
     const newSection = generateSection(type, website.siteName, website.industry);
     const footerIdx = website.sections.findIndex(s => s.type === 'footer');
-    if (footerIdx >= 0) {
-      website.sections.splice(footerIdx, 0, newSection);
-    } else {
-      website.sections.push(newSection);
-    }
+    if (footerIdx >= 0) website.sections.splice(footerIdx, 0, newSection);
+    else website.sections.push(newSection);
     updateWebsite(website);
     pushHistory(website, `Add ${type} section`);
     setState({ showAddSection: false });
-    addToast(`${type} section added!`, 'success');
+    addToast(`${type} added`, 'success');
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setState({ showAddSection: false })}>
-      <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full mx-4 animate-bounce-in" onClick={e => e.stopPropagation()}>
-        <div className="p-4 border-b border-[#e2e8f0] flex items-center justify-between">
-          <h2 className="font-semibold text-[#1e293b]">Add Section</h2>
-          <button onClick={() => setState({ showAddSection: false })} className="p-1 hover:bg-gray-100 rounded"><X size={16} /></button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setState({ showAddSection: false })}>
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
+        <div className="p-3 border-b border-gray-100 flex items-center justify-between">
+          <h2 className="text-sm font-medium text-black">Add Section</h2>
+          <button onClick={() => setState({ showAddSection: false })} className="p-1 hover:bg-gray-100 rounded"><X size={14} /></button>
         </div>
-        <div className="p-4 grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-96 overflow-y-auto">
+        <div className="p-3 grid grid-cols-4 gap-1.5 max-h-80 overflow-y-auto">
           {sectionTypes.map(st => (
-            <button
-              key={st.type}
-              onClick={() => addSection(st.type)}
-              className="p-3 rounded-xl border border-[#e2e8f0] hover:border-indigo-300 hover:bg-indigo-50 transition text-center"
-            >
-              <span className="text-2xl block mb-1">{st.icon}</span>
-              <span className="text-xs font-medium text-[#64748b]">{st.label}</span>
+            <button key={st.type} onClick={() => addSection(st.type)} className="p-2.5 rounded border border-gray-200 hover:border-black hover:bg-gray-50 transition text-center">
+              <span className="text-lg block mb-0.5">{st.icon}</span>
+              <span className="text-[10px] font-medium text-gray-600">{st.label}</span>
             </button>
           ))}
         </div>
@@ -1013,33 +1152,31 @@ function AddSectionModal() {
 function ThemePanel() {
   const state = useStore();
   if (!state.showThemePanel || !state.currentProject) return null;
-
   const theme = state.currentProject.website.themeSettings;
 
   const updateThemeSetting = (key: keyof ThemeSettings, value: any) => {
-    const newTheme = { ...theme, [key]: value };
-    updateTheme(newTheme);
+    updateTheme({ ...theme, [key]: value });
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setState({ showThemePanel: false })}>
-      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 animate-bounce-in max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <div className="p-4 border-b border-[#e2e8f0] flex items-center justify-between sticky top-0 bg-white z-10">
-          <h2 className="font-semibold text-[#1e293b]">Theme Settings</h2>
-          <button onClick={() => setState({ showThemePanel: false })} className="p-1 hover:bg-gray-100 rounded"><X size={16} /></button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setState({ showThemePanel: false })}>
+      <div className="bg-white rounded-lg shadow-xl max-w-sm w-full mx-4 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="p-3 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
+          <h2 className="text-sm font-medium text-black">Theme</h2>
+          <button onClick={() => setState({ showThemePanel: false })} className="p-1 hover:bg-gray-100 rounded"><X size={14} /></button>
         </div>
-        <div className="p-4 space-y-4">
+        <div className="p-3 space-y-4">
           {/* Presets */}
           <div>
-            <label className="text-xs font-medium text-[#64748b] mb-2 block">Presets</label>
-            <div className="grid grid-cols-4 gap-2">
+            <label className="text-[10px] font-medium text-gray-500 mb-1.5 block uppercase tracking-wide">Presets</label>
+            <div className="grid grid-cols-4 gap-1.5">
               {Object.entries(THEME_PRESETS).map(([key, preset]) => (
                 <button
                   key={key}
                   onClick={() => updateTheme(preset)}
-                  className={`p-2 rounded-lg border text-xs font-medium capitalize transition ${theme.preset === key ? 'border-indigo-400 bg-indigo-50 text-indigo-600' : 'border-[#e2e8f0] hover:border-indigo-200'}`}
+                  className={`p-1.5 rounded border text-[10px] font-medium capitalize transition ${theme.preset === key ? 'border-black bg-gray-50' : 'border-gray-200 hover:border-gray-400'}`}
                 >
-                  <div className="w-full h-4 rounded mb-1" style={{ background: `linear-gradient(135deg, ${preset.primaryColor}, ${preset.secondaryColor})` }} />
+                  <div className="w-full h-3 rounded-sm mb-1" style={{ background: `linear-gradient(135deg, ${preset.primaryColor}, ${preset.secondaryColor})` }} />
                   {key}
                 </button>
               ))}
@@ -1047,58 +1184,40 @@ function ThemePanel() {
           </div>
 
           {/* Colors */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-medium text-[#64748b] mb-1 block">Primary Color</label>
-              <div className="flex items-center gap-2">
-                <input type="color" value={theme.primaryColor} onChange={(e) => updateThemeSetting('primaryColor', e.target.value)} className="w-8 h-8 rounded cursor-pointer border-0" />
-                <span className="text-xs text-[#64748b]">{theme.primaryColor}</span>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { key: 'primaryColor' as const, label: 'Primary' },
+              { key: 'secondaryColor' as const, label: 'Secondary' },
+              { key: 'backgroundColor' as const, label: 'Background' },
+              { key: 'textColor' as const, label: 'Text' },
+            ].map(({ key, label }) => (
+              <div key={key}>
+                <label className="text-[10px] font-medium text-gray-500 mb-0.5 block uppercase tracking-wide">{label}</label>
+                <div className="flex items-center gap-1.5">
+                  <input type="color" value={theme[key]} onChange={(e) => updateThemeSetting(key, e.target.value)} className="w-6 h-6 rounded cursor-pointer border border-gray-200" />
+                  <span className="text-[10px] text-gray-400">{theme[key]}</span>
+                </div>
               </div>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-[#64748b] mb-1 block">Secondary Color</label>
-              <div className="flex items-center gap-2">
-                <input type="color" value={theme.secondaryColor} onChange={(e) => updateThemeSetting('secondaryColor', e.target.value)} className="w-8 h-8 rounded cursor-pointer border-0" />
-                <span className="text-xs text-[#64748b]">{theme.secondaryColor}</span>
-              </div>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-[#64748b] mb-1 block">Background</label>
-              <div className="flex items-center gap-2">
-                <input type="color" value={theme.backgroundColor} onChange={(e) => updateThemeSetting('backgroundColor', e.target.value)} className="w-8 h-8 rounded cursor-pointer border-0" />
-                <span className="text-xs text-[#64748b]">{theme.backgroundColor}</span>
-              </div>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-[#64748b] mb-1 block">Text Color</label>
-              <div className="flex items-center gap-2">
-                <input type="color" value={theme.textColor} onChange={(e) => updateThemeSetting('textColor', e.target.value)} className="w-8 h-8 rounded cursor-pointer border-0" />
-                <span className="text-xs text-[#64748b]">{theme.textColor}</span>
-              </div>
-            </div>
+            ))}
           </div>
 
           {/* Font */}
           <div>
-            <label className="text-xs font-medium text-[#64748b] mb-1 block">Font Family</label>
-            <select value={theme.fontFamily} onChange={(e) => updateThemeSetting('fontFamily', e.target.value)} className="w-full px-3 py-2 text-sm border border-[#e2e8f0] rounded-lg">
-              <option value="Inter">Inter (Modern)</option>
-              <option value="Playfair Display">Playfair Display (Elegant)</option>
-              <option value="system-ui">System UI</option>
+            <label className="text-[10px] font-medium text-gray-500 mb-1 block uppercase tracking-wide">Font</label>
+            <select value={theme.fontFamily} onChange={(e) => updateThemeSetting('fontFamily', e.target.value)} className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded">
+              <option value="Inter">Inter</option>
+              <option value="Playfair Display">Playfair Display</option>
+              <option value="system-ui">System</option>
             </select>
           </div>
 
           {/* Button Style */}
           <div>
-            <label className="text-xs font-medium text-[#64748b] mb-2 block">Button Style</label>
-            <div className="flex gap-2">
-              {(['rounded', 'pill', 'square'] as const).map(style => (
-                <button
-                  key={style}
-                  onClick={() => updateThemeSetting('buttonStyle', style)}
-                  className={`flex-1 py-2 text-xs font-medium rounded-lg border transition ${theme.buttonStyle === style ? 'border-indigo-400 bg-indigo-50 text-indigo-600' : 'border-[#e2e8f0] hover:border-indigo-200'}`}
-                >
-                  {style}
+            <label className="text-[10px] font-medium text-gray-500 mb-1 block uppercase tracking-wide">Buttons</label>
+            <div className="flex gap-1">
+              {(['rounded', 'pill', 'square'] as const).map(s => (
+                <button key={s} onClick={() => updateThemeSetting('buttonStyle', s)} className={`flex-1 py-1.5 text-[10px] font-medium rounded border transition ${theme.buttonStyle === s ? 'border-black bg-gray-50' : 'border-gray-200'}`}>
+                  {s}
                 </button>
               ))}
             </div>
@@ -1106,30 +1225,13 @@ function ThemePanel() {
 
           {/* Spacing */}
           <div>
-            <label className="text-xs font-medium text-[#64748b] mb-2 block">Spacing</label>
-            <div className="flex gap-2">
+            <label className="text-[10px] font-medium text-gray-500 mb-1 block uppercase tracking-wide">Spacing</label>
+            <div className="flex gap-1">
               {(['compact', 'normal', 'spacious'] as const).map(sp => (
-                <button
-                  key={sp}
-                  onClick={() => updateThemeSetting('spacing', sp)}
-                  className={`flex-1 py-2 text-xs font-medium rounded-lg border transition ${theme.spacing === sp ? 'border-indigo-400 bg-indigo-50 text-indigo-600' : 'border-[#e2e8f0] hover:border-indigo-200'}`}
-                >
+                <button key={sp} onClick={() => updateThemeSetting('spacing', sp)} className={`flex-1 py-1.5 text-[10px] font-medium rounded border transition ${theme.spacing === sp ? 'border-black bg-gray-50' : 'border-gray-200'}`}>
                   {sp}
                 </button>
               ))}
-            </div>
-          </div>
-
-          {/* Mode */}
-          <div>
-            <label className="text-xs font-medium text-[#64748b] mb-2 block">Mode</label>
-            <div className="flex gap-2">
-              <button onClick={() => updateThemeSetting('mode', 'light')} className={`flex-1 py-2 text-xs font-medium rounded-lg border flex items-center justify-center gap-1 transition ${theme.mode === 'light' ? 'border-indigo-400 bg-indigo-50 text-indigo-600' : 'border-[#e2e8f0]'}`}>
-                <Sun size={14} /> Light
-              </button>
-              <button onClick={() => updateThemeSetting('mode', 'dark')} className={`flex-1 py-2 text-xs font-medium rounded-lg border flex items-center justify-center gap-1 transition ${theme.mode === 'dark' ? 'border-indigo-400 bg-indigo-50 text-indigo-600' : 'border-[#e2e8f0]'}`}>
-                <Moon size={14} /> Dark
-              </button>
             </div>
           </div>
         </div>
@@ -1143,24 +1245,24 @@ function ExportModal() {
   if (!state.showExportMenu || !state.currentProject) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setState({ showExportMenu: false })}>
-      <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full mx-4 animate-bounce-in" onClick={e => e.stopPropagation()}>
-        <div className="p-4 border-b border-[#e2e8f0] flex items-center justify-between">
-          <h2 className="font-semibold text-[#1e293b]">Export Website</h2>
-          <button onClick={() => setState({ showExportMenu: false })} className="p-1 hover:bg-gray-100 rounded"><X size={16} /></button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setState({ showExportMenu: false })}>
+      <div className="bg-white rounded-lg shadow-xl max-w-xs w-full mx-4" onClick={e => e.stopPropagation()}>
+        <div className="p-3 border-b border-gray-100 flex items-center justify-between">
+          <h2 className="text-sm font-medium text-black">Export</h2>
+          <button onClick={() => setState({ showExportMenu: false })} className="p-1 hover:bg-gray-100 rounded"><X size={14} /></button>
         </div>
-        <div className="p-4 space-y-2">
-          <button onClick={() => { downloadHTML(state.currentProject!.website); setState({ showExportMenu: false }); addToast('HTML downloaded!', 'success'); }} className="w-full p-3 rounded-lg border border-[#e2e8f0] hover:bg-gray-50 flex items-center gap-3 transition text-left">
-            <div className="w-10 h-10 bg-orange-50 rounded-lg flex items-center justify-center"><FileCode size={18} className="text-orange-500" /></div>
-            <div><p className="font-medium text-sm text-[#1e293b]">Download HTML</p><p className="text-xs text-[#94a3b8]">Complete standalone HTML file</p></div>
+        <div className="p-2 space-y-1">
+          <button onClick={() => { downloadHTML(state.currentProject!.website); setState({ showExportMenu: false }); addToast('Downloaded!', 'success'); }} className="w-full p-2.5 rounded hover:bg-gray-50 flex items-center gap-2.5 transition text-left">
+            <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center"><FileCode size={14} className="text-gray-600" /></div>
+            <div><p className="text-xs font-medium text-black">Download HTML</p><p className="text-[10px] text-gray-400">Standalone file</p></div>
           </button>
-          <button onClick={() => { downloadJSON(state.currentProject!.website); setState({ showExportMenu: false }); addToast('JSON config downloaded!', 'success'); }} className="w-full p-3 rounded-lg border border-[#e2e8f0] hover:bg-gray-50 flex items-center gap-3 transition text-left">
-            <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center"><Code size={18} className="text-blue-500" /></div>
-            <div><p className="font-medium text-sm text-[#1e293b]">Download JSON Config</p><p className="text-xs text-[#94a3b8]">Website configuration data</p></div>
+          <button onClick={() => { downloadJSON(state.currentProject!.website); setState({ showExportMenu: false }); addToast('Downloaded!', 'success'); }} className="w-full p-2.5 rounded hover:bg-gray-50 flex items-center gap-2.5 transition text-left">
+            <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center"><Code size={14} className="text-gray-600" /></div>
+            <div><p className="text-xs font-medium text-black">Download JSON</p><p className="text-[10px] text-gray-400">Configuration data</p></div>
           </button>
-          <button onClick={() => { navigator.clipboard.writeText(generateFullHTML(state.currentProject!.website)); setState({ showExportMenu: false }); addToast('HTML copied to clipboard!', 'success'); }} className="w-full p-3 rounded-lg border border-[#e2e8f0] hover:bg-gray-50 flex items-center gap-3 transition text-left">
-            <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center"><Copy size={18} className="text-green-500" /></div>
-            <div><p className="font-medium text-sm text-[#1e293b]">Copy HTML Code</p><p className="text-xs text-[#94a3b8]">Copy to clipboard</p></div>
+          <button onClick={() => { navigator.clipboard.writeText(generateFullHTML(state.currentProject!.website)); setState({ showExportMenu: false }); addToast('Copied!', 'success'); }} className="w-full p-2.5 rounded hover:bg-gray-50 flex items-center gap-2.5 transition text-left">
+            <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center"><Copy size={14} className="text-gray-600" /></div>
+            <div><p className="text-xs font-medium text-black">Copy HTML</p><p className="text-[10px] text-gray-400">To clipboard</p></div>
           </button>
         </div>
       </div>
@@ -1172,37 +1274,34 @@ function AuthModal() {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={() => setState({ showAuthModal: false })}>
-      <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full mx-4 animate-bounce-in" onClick={e => e.stopPropagation()}>
-        <div className="p-6">
-          <div className="text-center mb-6">
-            <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center mx-auto mb-3">
-              <Sparkles size={20} className="text-white" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setState({ showAuthModal: false })}>
+      <div className="bg-white rounded-lg shadow-xl max-w-xs w-full mx-4" onClick={e => e.stopPropagation()}>
+        <div className="p-5">
+          <div className="text-center mb-5">
+            <div className="w-10 h-10 bg-black rounded-lg flex items-center justify-center mx-auto mb-3">
+              <Sparkles size={16} className="text-white" />
             </div>
-            <h2 className="text-xl font-bold text-[#1e293b]">{mode === 'signin' ? 'Welcome back' : 'Create account'}</h2>
-            <p className="text-sm text-[#64748b] mt-1">{mode === 'signin' ? 'Sign in to your account' : 'Start building with AI'}</p>
+            <h2 className="text-base font-semibold text-black">{mode === 'signin' ? 'Welcome back' : 'Create account'}</h2>
           </div>
-          <div className="space-y-3">
-            {mode === 'signup' && (
-              <input type="text" placeholder="Full name" className="w-full px-3 py-2.5 border border-[#e2e8f0] rounded-lg text-sm outline-none focus:border-indigo-300" />
-            )}
-            <input type="email" placeholder="Email address" className="w-full px-3 py-2.5 border border-[#e2e8f0] rounded-lg text-sm outline-none focus:border-indigo-300" />
-            <input type="password" placeholder="Password" className="w-full px-3 py-2.5 border border-[#e2e8f0] rounded-lg text-sm outline-none focus:border-indigo-300" />
-            <button onClick={() => { setState({ showAuthModal: false, isAuthenticated: true }); addToast(mode === 'signin' ? 'Signed in!' : 'Account created!', 'success'); }} className="w-full py-2.5 bg-indigo-500 text-white rounded-lg font-medium text-sm hover:bg-indigo-600 transition">
+          <div className="space-y-2.5">
+            {mode === 'signup' && <input type="text" placeholder="Name" className="w-full px-3 py-2 border border-gray-200 rounded text-xs outline-none focus:border-gray-400" />}
+            <input type="email" placeholder="Email" className="w-full px-3 py-2 border border-gray-200 rounded text-xs outline-none focus:border-gray-400" />
+            <input type="password" placeholder="Password" className="w-full px-3 py-2 border border-gray-200 rounded text-xs outline-none focus:border-gray-400" />
+            <button onClick={() => { setState({ showAuthModal: false, isAuthenticated: true }); addToast(mode === 'signin' ? 'Signed in!' : 'Account created!', 'success'); }} className="w-full py-2 bg-black text-white rounded text-xs font-medium hover:bg-gray-800">
               {mode === 'signin' ? 'Sign In' : 'Create Account'}
             </button>
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-[#e2e8f0]" /></div>
-              <div className="relative flex justify-center"><span className="bg-white px-3 text-xs text-[#94a3b8]">or</span></div>
+            <div className="relative my-3">
+              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200" /></div>
+              <div className="relative flex justify-center"><span className="bg-white px-2 text-[10px] text-gray-400">or</span></div>
             </div>
-            <button className="w-full py-2.5 border border-[#e2e8f0] rounded-lg text-sm font-medium text-[#1e293b] hover:bg-gray-50 transition flex items-center justify-center gap-2">
-              <svg className="w-4 h-4" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+            <button className="w-full py-2 border border-gray-200 rounded text-xs font-medium hover:bg-gray-50 flex items-center justify-center gap-2">
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
               Continue with Google
             </button>
           </div>
-          <p className="text-center text-sm text-[#64748b] mt-4">
-            {mode === 'signin' ? "Don't have an account? " : 'Already have an account? '}
-            <button onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')} className="text-indigo-500 font-medium">{mode === 'signin' ? 'Sign up' : 'Sign in'}</button>
+          <p className="text-center text-[11px] text-gray-500 mt-3">
+            {mode === 'signin' ? "No account? " : 'Have an account? '}
+            <button onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')} className="text-black font-medium underline">{mode === 'signin' ? 'Sign up' : 'Sign in'}</button>
           </p>
         </div>
       </div>
@@ -1213,22 +1312,22 @@ function AuthModal() {
 // ============ PUBLISHING OVERLAY ============
 function PublishingOverlay() {
   const state = useStore();
-  const steps = ['Preparing website', 'Building project', 'Optimizing assets', 'Publishing', 'Website published!'];
+  const steps = ['Preparing website', 'Building project', 'Optimizing assets', 'Publishing', 'Done!'];
 
   return (
-    <div className="fixed inset-0 z-50 bg-white/95 backdrop-blur-sm flex items-center justify-center">
-      <div className="max-w-md w-full px-6 animate-fade-in text-center">
+    <div className="fixed inset-0 z-50 bg-white flex items-center justify-center">
+      <div className="max-w-xs w-full px-6 text-center">
         {state.publishStep < steps.length - 1 ? (
           <>
-            <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-pulse-slow">
-              <Rocket size={28} className="text-white" />
+            <div className="w-12 h-12 bg-black rounded-xl flex items-center justify-center mx-auto mb-4">
+              <Rocket size={20} className="text-white" />
             </div>
-            <h2 className="text-xl font-bold text-[#1e293b] mb-2">Publishing your website</h2>
-            <p className="text-[#64748b] text-sm mb-6">{steps[state.publishStep]}...</p>
-            <div className="space-y-2">
+            <h2 className="text-base font-semibold text-black mb-1">Publishing</h2>
+            <p className="text-xs text-gray-500 mb-5">{steps[state.publishStep]}...</p>
+            <div className="space-y-1.5">
               {steps.slice(0, -1).map((step, i) => (
-                <div key={i} className={`flex items-center gap-2 text-sm ${i <= state.publishStep ? 'text-[#1e293b]' : 'text-[#94a3b8]'}`}>
-                  {i < state.publishStep ? <CheckCircle2 size={16} className="text-green-500" /> : i === state.publishStep ? <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin-slow" /> : <div className="w-4 h-4 rounded-full border-2 border-gray-200" />}
+                <div key={i} className={`flex items-center gap-2 text-xs ${i <= state.publishStep ? 'text-black' : 'text-gray-300'}`}>
+                  {i < state.publishStep ? <CheckCircle2 size={13} className="text-green-500" /> : i === state.publishStep ? <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" /> : <div className="w-3.5 h-3.5 rounded-full border border-gray-200" />}
                   {step}
                 </div>
               ))}
@@ -1236,19 +1335,19 @@ function PublishingOverlay() {
           </>
         ) : (
           <>
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce-in">
-              <CheckCircle2 size={32} className="text-green-500" />
+            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 size={24} className="text-green-600" />
             </div>
-            <h2 className="text-xl font-bold text-[#1e293b] mb-2">Your website is live!</h2>
-            <p className="text-[#64748b] text-sm mb-4">Demo mode — in production, your site would be deployed to a real URL.</p>
-            <div className="bg-gray-50 rounded-lg p-3 mb-6">
-              <p className="text-xs text-[#94a3b8] mb-1">Published URL</p>
-              <p className="text-sm font-medium text-indigo-600 flex items-center justify-center gap-1">
-                <Globe size={14} />
-                https://siteforge-demo.vercel.app/{state.currentProject?.name.toLowerCase().replace(/\s+/g, '-')}
+            <h2 className="text-base font-semibold text-black mb-1">Website is live!</h2>
+            <p className="text-xs text-gray-500 mb-4">Demo mode — in production this would deploy to a real URL.</p>
+            <div className="bg-gray-50 rounded p-2.5 mb-4">
+              <p className="text-[10px] text-gray-400 mb-0.5">URL</p>
+              <p className="text-xs font-medium text-black flex items-center justify-center gap-1">
+                <Globe size={11} />
+                siteforge.vercel.app/{state.currentProject?.name.toLowerCase().replace(/\s+/g, '-')}
               </p>
             </div>
-            <button onClick={() => setState({ isPublishing: false, publishStep: 0 })} className="btn-primary">
+            <button onClick={() => setState({ isPublishing: false, publishStep: 0 })} className="px-4 py-2 bg-black text-white text-xs font-medium rounded hover:bg-gray-800">
               Done
             </button>
           </>
@@ -1266,27 +1365,25 @@ function simulatePublish() {
     if (step >= 5) {
       clearInterval(interval);
       if (getState().currentProject) {
-        const updated = { ...getState().currentProject!, status: 'published' as const, publishedUrl: `https://siteforge-demo.vercel.app/${getState().currentProject!.name.toLowerCase().replace(/\s+/g, '-')}` };
+        const updated = { ...getState().currentProject!, status: 'published' as const, publishedUrl: `https://siteforge.vercel.app/${getState().currentProject!.name.toLowerCase().replace(/\s+/g, '-')}` };
         setState({ currentProject: updated });
         saveProject();
       }
     }
-  }, 800);
+  }, 700);
 }
 
 // ============ TOASTS ============
 function Toasts() {
   const state = useStore();
   return (
-    <div className="fixed bottom-4 right-4 z-[100] space-y-2">
+    <div className="fixed bottom-4 right-4 z-[100] space-y-1.5">
       {state.toasts.map(toast => (
-        <div key={toast.id} className={`toast-enter px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2 ${toast.type === 'success' ? 'bg-green-500 text-white' : toast.type === 'error' ? 'bg-red-500 text-white' : 'bg-[#1e293b] text-white'}`}>
-          {toast.type === 'success' ? <CheckCircle2 size={14} /> : toast.type === 'error' ? <AlertCircle size={14} /> : <Info size={14} />}
+        <div key={toast.id} className={`px-3 py-2 rounded-md shadow-sm text-xs font-medium flex items-center gap-1.5 ${toast.type === 'success' ? 'bg-black text-white' : toast.type === 'error' ? 'bg-red-600 text-white' : 'bg-gray-800 text-white'}`}>
+          {toast.type === 'success' ? <CheckCircle2 size={12} /> : toast.type === 'error' ? <AlertCircle size={12} /> : <Info size={12} />}
           {toast.message}
         </div>
       ))}
     </div>
   );
 }
-
-
