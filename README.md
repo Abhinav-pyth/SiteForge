@@ -1,6 +1,29 @@
 # SiteForge AI
 
-AI-powered website builder that generates complete responsive websites from natural language descriptions.
+AI-powered website builder that generates complete responsive websites from natural language descriptions, featuring Supabase authentication with email OTP registration and role-based access control.
+
+## 🔐 Authentication
+
+SiteForge AI includes a complete authentication system powered by Supabase:
+
+- **Email OTP Registration** - Secure signup with email verification
+- **Email/Password Login** - Traditional authentication
+- **Role-Based Access** - Admin and regular user roles
+- **Admin Dashboard** - Manage users and permissions
+- **Persistent Sessions** - Stay logged in across sessions
+
+See [AUTHENTICATION.md](./AUTHENTICATION.md) and [SUPABASE_SETUP.md](./SUPABASE_SETUP.md) for detailed setup instructions.
+
+### Quick Auth Setup
+
+1. Create a Supabase project at [supabase.com](https://supabase.com)
+2. Copy the SQL schema from `SUPABASE_SETUP.md` and run it in the SQL Editor
+3. Create a `.env` file with your Supabase credentials:
+   ```env
+   VITE_SUPABASE_URL=https://your-project-id.supabase.co
+   VITE_SUPABASE_ANON_KEY=your-anon-key
+   ```
+4. Create your first admin user by updating the role in the profiles table
 
 ## 🚀 Deploy to Vercel
 

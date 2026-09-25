@@ -10,12 +10,16 @@ import {
 import { generateFullHTML, generateReactCode, downloadHTML, downloadJSON } from './lib/export';
 import { SectionRenderer } from './components/SectionRenderer';
 import { TemplatePreview } from './components/TemplatePreview';
+import AuthModal from './components/AuthModal';
+import AdminDashboard from './components/AdminDashboard';
+import { AuthProvider, useAuth } from './components/AuthProvider';
+import UserMenu from './components/UserMenu';
 import {
   Sparkles, Monitor, Tablet, Smartphone, Code, Download, Send, Plus,
   Undo2, Redo2, Save, Trash2, Copy, ChevronUp, ChevronDown, X, Check,
   Palette, Settings, Globe, Layout, Layers, ArrowLeft, ArrowRight, GripVertical,
   Rocket, FileCode, Grid3X3, CreditCard, MessageCircle,
-  FolderOpen, Edit3, Clock, CheckCircle2, AlertCircle, Info, Zap, MessageSquare
+  FolderOpen, Edit3, Clock, CheckCircle2, AlertCircle, Info, Zap, MessageSquare, LogOut, Shield
 } from 'lucide-react';
 
 function useStore() {
@@ -26,8 +30,9 @@ function useStore() {
   return state;
 }
 
-export default function App() {
+function AppContent() {
   const state = useStore();
+  const { user, profile, isAdmin, signOut } = useAuth();
 
   useEffect(() => {
     initializeStore();
@@ -43,6 +48,11 @@ export default function App() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
+  // If viewing admin dashboard
+  if (state.view === 'admin' && isAdmin) {
+    return <AdminDashboard onBack={() => setView('landing')} />;
+  }
+
   return (
     <div className="min-h-screen bg-[#fafafa]">
       {state.view === 'landing' && <LandingView />}
@@ -51,7 +61,14 @@ export default function App() {
       {state.view === 'templates' && <TemplatesView />}
       {state.view === 'pricing' && <PricingView />}
       <Toasts />
-      {state.showAuthModal && <AuthModal />}
+      <AuthModal
+        isOpen={state.showAuthModal}
+        onClose={() => setState({ showAuthModal: false })}
+        onAuthSuccess={() => {
+          setState({ showAuthModal: false });
+          addToast('Successfully authenticated!', 'success');
+        }}
+      />
       {state.isGenerating && <GeneratingOverlay />}
       {state.isPublishing && <PublishingOverlay />}
       {state.view === 'builder' && state.showAddSection && <AddSectionModal />}
@@ -61,10 +78,19 @@ export default function App() {
   );
 }
 
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
+}
+
 // ============ LANDING VIEW ============
 function LandingView() {
   const [prompt, setPrompt] = useState('');
   const state = useStore();
+  const { user } = useAuth();
 
   const handleGenerate = () => {
     if (!prompt.trim()) return;
@@ -102,9 +128,11 @@ function LandingView() {
                 </button>
               </nav>
             </div>
-            <button onClick={() => setState({ showAuthModal: true })} className="btn-primary text-sm">
-              Sign In
-            </button>
+            {user ? <UserMenu /> : (
+              <button onClick={() => setState({ showAuthModal: true })} className="btn-primary text-sm">
+                Sign In
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -394,19 +422,7 @@ function Toasts() {
   );
 }
 
-function AuthModal() {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setState({ showAuthModal: false })}>
-      <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
-        <h2 className="text-2xl font-bold mb-4">Sign In</h2>
-        <p className="text-neutral-600 mb-6">Welcome back to SiteForge AI</p>
-        <button onClick={() => setState({ showAuthModal: false })} className="w-full btn-primary">
-          Continue
-        </button>
-      </div>
-    </div>
-  );
-}
+// AuthModal is now imported from ./components/AuthModal
 
 function GeneratingOverlay() {
   const state = useStore();
