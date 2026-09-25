@@ -26,6 +26,7 @@ import {
 import { generateFullHTML, generateReactCode, downloadHTML, downloadJSON } from './lib/export';
 import { templates, examplePrompts } from './lib/templates';
 import { SectionRenderer } from './components/SectionRenderer';
+import { TemplatePreview } from './components/TemplatePreview';
 
 function useStore() {
   const [state, setLocalState] = useState(getState());
@@ -421,9 +422,8 @@ function LandingView() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {templates.slice(0, 6).map((template) => (
                 <div key={template.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden hover:border-gray-300 hover:shadow-xl hover:shadow-gray-200/50 transition-all group">
-                  <div className="h-48 bg-gradient-to-br from-gray-50 via-white to-gray-100 flex items-center justify-center relative overflow-hidden">
-                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/30 to-purple-50/30 group-hover:from-indigo-100/40 group-hover:to-purple-100/40 transition-colors" />
-                    <span className="text-6xl relative z-10 group-hover:scale-125 transition-transform duration-300">{template.preview}</span>
+                  <div className="h-48 relative overflow-hidden">
+                    <TemplatePreview templateId={template.id} className="group-hover:scale-105 transition-transform duration-300" />
                   </div>
                   <div className="p-6">
                     <div className="flex items-center justify-between mb-3">
@@ -1237,35 +1237,37 @@ function TemplatesView() {
   return (
     <div className="h-full flex flex-col">
       <TopNav />
-      <main className="flex-1 overflow-auto">
-        <div className="max-w-5xl mx-auto px-4 py-8">
-          <h1 className="text-xl font-semibold text-black mb-1">Templates</h1>
-          <p className="text-sm text-gray-500 mb-5">Start with a pre-built design</p>
+      <main className="flex-1 overflow-auto bg-gradient-to-b from-white via-gray-50/30 to-white">
+        <div className="max-w-[1400px] mx-auto px-6 py-16">
+          <div className="text-center mb-12">
+            <h1 className="text-4xl md:text-5xl font-bold text-black mb-4 tracking-tight">Templates</h1>
+            <p className="text-xl text-gray-600 max-w-[600px] mx-auto">Start with a professionally designed template</p>
+          </div>
 
-          <div className="flex gap-1.5 mb-5 flex-wrap">
+          <div className="flex gap-2 mb-10 flex-wrap justify-center">
             {categories.map(cat => (
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-2.5 py-1 text-xs rounded-full font-medium transition ${selectedCategory === cat ? 'bg-black text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                className={`px-5 py-2.5 text-sm rounded-full font-medium transition ${selectedCategory === cat ? 'bg-black text-white shadow-md' : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-400 hover:bg-gray-50'}`}
               >
                 {cat}
               </button>
             ))}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {filtered.map(template => (
-              <div key={template.id} className="border border-gray-200 rounded-lg overflow-hidden hover:border-gray-300 transition">
-                <div className="h-32 bg-gray-50 flex items-center justify-center">
-                  <span className="text-4xl">{template.preview}</span>
+              <div key={template.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden hover:border-gray-300 hover:shadow-xl hover:shadow-gray-200/50 transition-all group">
+                <div className="h-48 relative overflow-hidden">
+                  <TemplatePreview templateId={template.id} className="group-hover:scale-105 transition-transform duration-300" />
                 </div>
-                <div className="p-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <h3 className="text-sm font-medium text-black">{template.name}</h3>
-                    <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 rounded text-gray-500">{template.category}</span>
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-bold text-lg text-black">{template.name}</h3>
+                    <span className="text-xs px-3 py-1 bg-gray-100 rounded-full text-gray-600 font-medium">{template.category}</span>
                   </div>
-                  <p className="text-xs text-gray-500 mb-2.5 line-clamp-2">{template.description}</p>
+                  <p className="text-sm text-gray-600 mb-5 line-clamp-2 leading-relaxed">{template.description}</p>
                   <button
                     onClick={() => {
                       setView('landing');
@@ -1274,7 +1276,7 @@ function TemplatesView() {
                         simulateGeneration(template.prompt);
                       }, 100);
                     }}
-                    className="w-full py-1.5 text-xs font-medium text-black bg-gray-100 rounded hover:bg-gray-200 transition"
+                    className="w-full py-2.5 text-sm font-semibold text-black bg-gray-100 rounded-lg hover:bg-gray-200 transition"
                   >
                     Use Template
                   </button>
