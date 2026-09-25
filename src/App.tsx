@@ -83,26 +83,26 @@ export default function App() {
 function TopNav() {
   const state = useStore();
   return (
-    <header className="border-b border-gray-200 bg-white shrink-0">
+    <header className="border-b border-gray-200/80 bg-white/80 backdrop-blur-md shrink-0 sticky top-0 z-50">
       <div className="max-w-[1400px] mx-auto px-6 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-8">
-          <button onClick={() => setView('landing')} className="flex items-center gap-2 font-semibold text-base">
-            <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
-              <Sparkles size={15} className="text-white" />
+        <div className="flex items-center gap-10">
+          <button onClick={() => setView('landing')} className="flex items-center gap-2.5 font-bold text-lg">
+            <div className="w-9 h-9 bg-gradient-to-br from-gray-900 to-black rounded-xl flex items-center justify-center shadow-sm">
+              <Sparkles size={16} className="text-white" />
             </div>
-            <span>SiteForge AI</span>
+            <span className="text-black">SiteForge AI</span>
           </button>
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden md:flex items-center gap-2">
             {[
-              { view: 'dashboard' as const, label: 'Projects', icon: <FolderOpen size={14} /> },
-              { view: 'templates' as const, label: 'Templates', icon: <Grid3X3 size={14} /> },
-              { view: 'pricing' as const, label: 'Pricing', icon: <CreditCard size={14} /> },
+              { view: 'dashboard' as const, label: 'Projects', icon: <FolderOpen size={15} /> },
+              { view: 'templates' as const, label: 'Templates', icon: <Grid3X3 size={15} /> },
+              { view: 'pricing' as const, label: 'Pricing', icon: <CreditCard size={15} /> },
             ].map(item => (
               <button
                 key={item.view}
                 onClick={() => setView(item.view)}
-                className={`px-3 py-2 rounded-lg text-sm flex items-center gap-1.5 transition ${
-                  state.view === item.view ? 'bg-gray-100 text-black font-medium' : 'text-gray-600 hover:text-black hover:bg-gray-50'
+                className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition ${
+                  state.view === item.view ? 'bg-gray-100 text-black' : 'text-gray-600 hover:text-black hover:bg-gray-50'
                 }`}
               >
                 {item.icon} {item.label}
@@ -110,11 +110,11 @@ function TopNav() {
             ))}
           </nav>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           {state.currentProject && state.view === 'builder' && (
-            <span className="text-sm text-gray-500 hidden sm:block">{state.currentProject.name}</span>
+            <span className="text-sm text-gray-500 hidden sm:block font-medium">{state.currentProject.name}</span>
           )}
-          <button onClick={() => setState({ showAuthModal: true })} className="w-9 h-9 rounded-full bg-gray-900 flex items-center justify-center text-white text-sm font-medium hover:bg-gray-800 transition">
+          <button onClick={() => setState({ showAuthModal: true })} className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-800 to-black flex items-center justify-center text-white text-sm font-semibold hover:from-black hover:to-gray-900 transition shadow-sm">
             U
           </button>
         </div>
@@ -139,45 +139,45 @@ function LandingView() {
   };
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col bg-gradient-to-b from-white via-gray-50/30 to-white">
       <TopNav />
       <main className="flex-1 overflow-auto">
         {/* Page Container */}
-        <div className="max-w-[1400px] mx-auto px-6 py-16 md:py-24">
+        <div className="max-w-[1400px] mx-auto px-6 py-20 md:py-28">
           
           {/* Hero Section */}
-          <div className="text-center mb-12 max-w-[800px] mx-auto">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-50 border border-gray-200 text-gray-700 rounded-full text-sm font-medium mb-6">
+          <div className="text-center mb-16 max-w-[850px] mx-auto">
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 text-gray-700 rounded-full text-sm font-medium mb-8 shadow-sm">
               <Sparkles size={14} className="text-gray-600" />
               AI Website Builder
             </div>
-            <h1 className="text-[38px] md:text-[48px] lg:text-[64px] font-bold text-black mb-4 leading-[1.05] tracking-tight">
+            <h1 className="text-[40px] md:text-[56px] lg:text-[72px] font-bold text-black mb-6 leading-[1.05] tracking-tight">
               Build websites<br />with a sentence.
             </h1>
-            <p className="text-lg md:text-xl text-gray-600 leading-relaxed">
+            <p className="text-xl md:text-2xl text-gray-600 leading-relaxed max-w-[700px] mx-auto">
               Describe your idea. SiteForge AI turns it into a beautiful, responsive website in minutes.
             </p>
           </div>
 
           {/* AI Prompt Box */}
-          <div className="max-w-[950px] mx-auto mb-8">
-            <div className="bg-white border border-gray-200 rounded-2xl shadow-lg shadow-gray-100/50 overflow-hidden">
+          <div className="max-w-[950px] mx-auto mb-10">
+            <div className="bg-white border border-gray-200 rounded-2xl shadow-xl shadow-gray-200/40 overflow-hidden">
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder="Create a modern website for a luxury women's footwear brand with a hero section, products, testimonials and contact page..."
-                className="w-full p-5 md:p-6 text-base text-black placeholder-gray-400 resize-none outline-none min-h-[130px] leading-relaxed"
+                className="w-full p-6 md:p-7 text-base md:text-lg text-black placeholder-gray-400 resize-none outline-none min-h-[140px] leading-relaxed"
                 rows={4}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleGenerate(); } }}
               />
-              <div className="flex items-center justify-between px-5 md:px-6 py-4 border-t border-gray-100 bg-gray-50/50">
-                <button onClick={() => setView('templates')} className="text-sm text-gray-600 hover:text-black flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-white transition">
+              <div className="flex items-center justify-between px-6 md:px-7 py-4 border-t border-gray-100 bg-gradient-to-r from-gray-50/80 to-gray-50/40">
+                <button onClick={() => setView('templates')} className="text-sm text-gray-600 hover:text-black flex items-center gap-1.5 px-3 py-2 rounded-lg hover:bg-white transition">
                   <Layout size={14} /> Browse Templates
                 </button>
                 <button
                   onClick={handleGenerate}
                   disabled={!prompt.trim()}
-                  className="px-5 py-2.5 bg-black text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2 transition shadow-sm"
+                  className="px-6 py-3 bg-black text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2 transition shadow-md hover:shadow-lg"
                 >
                   <Sparkles size={15} />
                   Generate Website
@@ -187,14 +187,14 @@ function LandingView() {
           </div>
 
           {/* Example Prompts */}
-          <div className="max-w-[800px] mx-auto mb-16">
-            <p className="text-center text-sm text-gray-500 mb-3">Try an example:</p>
-            <div className="flex flex-wrap justify-center gap-2">
+          <div className="max-w-[800px] mx-auto mb-20">
+            <p className="text-center text-sm text-gray-500 mb-4 font-medium">Try an example:</p>
+            <div className="flex flex-wrap justify-center gap-2.5">
               {examplePrompts.map((ep) => (
                 <button
                   key={ep}
                   onClick={() => handleExampleClick(ep)}
-                  className="px-4 py-2 border border-gray-200 rounded-full text-sm text-gray-700 hover:border-gray-400 hover:bg-gray-50 transition"
+                  className="px-5 py-2.5 border border-gray-200 rounded-full text-sm text-gray-700 hover:border-gray-400 hover:bg-white hover:shadow-sm transition"
                 >
                   {ep}
                 </button>
@@ -203,106 +203,129 @@ function LandingView() {
           </div>
 
           {/* Demo CTA */}
-          <div className="text-center mb-20">
+          <div className="text-center mb-24">
             <button
               onClick={() => {
                 const demoPrompt = 'Create a modern SaaS landing page for an AI analytics startup called CloudFlow. Include hero, features, pricing, testimonials, FAQ, and CTA sections.';
                 setState({ isGenerating: true, generationStep: 0 });
                 simulateGeneration(demoPrompt);
               }}
-              className="inline-flex items-center gap-2 px-6 py-3 border-2 border-gray-300 text-base font-medium rounded-xl hover:border-black hover:bg-gray-50 transition"
+              className="inline-flex items-center gap-2.5 px-7 py-3.5 bg-gradient-to-r from-gray-900 to-black text-white text-base font-medium rounded-xl hover:from-black hover:to-gray-900 transition shadow-lg hover:shadow-xl"
             >
-              <Rocket size={16} />
+              <Rocket size={18} />
               Try a Demo Website
             </button>
           </div>
 
           {/* Hero Visual - Browser Mockup */}
-          <div className="max-w-[1100px] mx-auto mb-24">
-            <div className="bg-white border border-gray-200 rounded-xl shadow-2xl shadow-gray-200/50 overflow-hidden">
+          <div className="max-w-[1200px] mx-auto mb-32">
+            <div className="bg-white border border-gray-200 rounded-2xl shadow-2xl shadow-gray-300/40 overflow-hidden">
               {/* Browser Chrome */}
-              <div className="h-10 bg-gray-100 border-b border-gray-200 flex items-center px-4 gap-2">
-                <div className="flex gap-1.5">
-                  <div className="w-3 h-3 rounded-full bg-gray-300" />
-                  <div className="w-3 h-3 rounded-full bg-gray-300" />
-                  <div className="w-3 h-3 rounded-full bg-gray-300" />
+              <div className="h-12 bg-gradient-to-b from-gray-100 to-gray-50 border-b border-gray-200 flex items-center px-5 gap-3">
+                <div className="flex gap-2">
+                  <div className="w-3 h-3 rounded-full bg-red-400" />
+                  <div className="w-3 h-3 rounded-full bg-yellow-400" />
+                  <div className="w-3 h-3 rounded-full bg-green-400" />
                 </div>
-                <div className="flex-1 mx-4">
-                  <div className="bg-white border border-gray-200 rounded-md px-3 py-1 text-xs text-gray-400 text-center max-w-md mx-auto">
+                <div className="flex-1 mx-6">
+                  <div className="bg-white border border-gray-200 rounded-lg px-4 py-1.5 text-xs text-gray-500 text-center max-w-sm mx-auto shadow-sm">
                     siteforge.ai/preview
                   </div>
                 </div>
               </div>
-              {/* Mock Website Content */}
-              <div className="bg-gradient-to-br from-gray-50 to-white p-12 md:p-16">
-                <div className="max-w-[600px] mx-auto text-center">
-                  <div className="inline-block px-3 py-1 bg-black text-white text-xs font-medium rounded-full mb-4">
-                    ✨ AI Generated
+              {/* Mock Website Content - More Realistic */}
+              <div className="bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-16 md:p-20">
+                <div className="max-w-[700px] mx-auto">
+                  {/* Nav Mockup */}
+                  <div className="flex items-center justify-between mb-12 pb-6 border-b border-gray-200/50">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-black rounded-lg" />
+                      <div className="h-4 w-24 bg-gray-200 rounded" />
+                    </div>
+                    <div className="flex gap-6">
+                      <div className="h-3 w-16 bg-gray-200 rounded" />
+                      <div className="h-3 w-16 bg-gray-200 rounded" />
+                      <div className="h-3 w-16 bg-gray-200 rounded" />
+                    </div>
                   </div>
-                  <h2 className="text-2xl md:text-3xl font-bold text-black mb-3">
-                    Build your business online
-                  </h2>
-                  <p className="text-base text-gray-600 mb-6">
-                    Beautiful. Fast. AI powered.
-                  </p>
-                  <button className="px-6 py-2.5 bg-black text-white text-sm font-medium rounded-lg">
-                    Get Started
-                  </button>
+                  {/* Hero Content Mockup */}
+                  <div className="text-center">
+                    <div className="inline-block px-4 py-1.5 bg-black text-white text-xs font-medium rounded-full mb-5">
+                      ✨ AI Generated
+                    </div>
+                    <h2 className="text-3xl md:text-4xl font-bold text-black mb-4">
+                      Build your business online
+                    </h2>
+                    <p className="text-lg text-gray-600 mb-8 max-w-[500px] mx-auto">
+                      Beautiful. Fast. AI powered. Create your perfect website in minutes.
+                    </p>
+                    <div className="flex gap-3 justify-center">
+                      <button className="px-8 py-3 bg-black text-white text-sm font-medium rounded-lg shadow-md">
+                        Get Started
+                      </button>
+                      <button className="px-8 py-3 bg-white text-black text-sm font-medium rounded-lg border border-gray-300 shadow-sm">
+                        Learn More
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Features Section */}
-          <div className="mb-24">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold text-black mb-3">
+          <div className="mb-32">
+            <div className="text-center mb-16">
+              <h2 className="text-4xl md:text-5xl font-bold text-black mb-4 tracking-tight">
                 Everything you need
               </h2>
-              <p className="text-lg text-gray-600">
+              <p className="text-xl text-gray-600 max-w-[600px] mx-auto">
                 Powerful features to build your website in minutes
               </p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {[
-                { icon: '⚡', title: 'Instant Generation', desc: 'Describe your idea and generate a complete website in seconds.' },
-                { icon: '🎨', title: 'AI Design', desc: 'AI automatically creates layouts, typography, colors and sections.' },
-                { icon: '🧩', title: 'Visual Editing', desc: 'Modify sections and content without writing code.' },
-                { icon: '💬', title: 'AI Editing', desc: 'Tell the AI what to change and instantly update the website.' },
-                { icon: '📱', title: 'Responsive Design', desc: 'Generate websites that work across desktop, tablet and mobile.' },
-                { icon: '📦', title: 'Export Anywhere', desc: 'Download your website or prepare it for deployment.' },
+                { icon: '⚡', title: 'Instant Generation', desc: 'Describe your idea and generate a complete website in seconds.', color: 'from-yellow-400 to-orange-500' },
+                { icon: '🎨', title: 'AI Design', desc: 'AI automatically creates layouts, typography, colors and sections.', color: 'from-pink-400 to-rose-500' },
+                { icon: '🧩', title: 'Visual Editing', desc: 'Modify sections and content without writing code.', color: 'from-blue-400 to-indigo-500' },
+                { icon: '💬', title: 'AI Editing', desc: 'Tell the AI what to change and instantly update the website.', color: 'from-green-400 to-emerald-500' },
+                { icon: '📱', title: 'Responsive Design', desc: 'Generate websites that work across desktop, tablet and mobile.', color: 'from-purple-400 to-violet-500' },
+                { icon: '📦', title: 'Export Anywhere', desc: 'Download your website or prepare it for deployment.', color: 'from-cyan-400 to-blue-500' },
               ].map((f, i) => (
-                <div key={i} className="p-6 border border-gray-200 rounded-xl hover:border-gray-300 hover:shadow-lg hover:shadow-gray-100/50 transition-all group">
-                  <div className="text-3xl mb-3 group-hover:scale-110 transition-transform">{f.icon}</div>
-                  <h3 className="font-semibold text-base text-black mb-2">{f.title}</h3>
-                  <p className="text-sm text-gray-600 leading-relaxed">{f.desc}</p>
+                <div key={i} className="p-7 bg-white border border-gray-200 rounded-2xl hover:border-gray-300 hover:shadow-xl hover:shadow-gray-200/50 transition-all group">
+                  <div className={`w-14 h-14 bg-gradient-to-br ${f.color} rounded-xl flex items-center justify-center text-2xl mb-5 group-hover:scale-110 transition-transform shadow-lg`}>
+                    {f.icon}
+                  </div>
+                  <h3 className="font-bold text-lg text-black mb-3">{f.title}</h3>
+                  <p className="text-base text-gray-600 leading-relaxed">{f.desc}</p>
                 </div>
               ))}
             </div>
           </div>
 
           {/* Template Section */}
-          <div className="mb-16">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold text-black mb-3">
+          <div className="mb-20">
+            <div className="text-center mb-16">
+              <h2 className="text-4xl md:text-5xl font-bold text-black mb-4 tracking-tight">
                 Start with a template
               </h2>
-              <p className="text-lg text-gray-600">
+              <p className="text-xl text-gray-600 max-w-[600px] mx-auto">
                 Choose from professionally designed templates
               </p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {templates.slice(0, 6).map((template) => (
-                <div key={template.id} className="border border-gray-200 rounded-xl overflow-hidden hover:border-gray-300 hover:shadow-lg hover:shadow-gray-100/50 transition-all group">
-                  <div className="h-40 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
-                    <span className="text-5xl group-hover:scale-110 transition-transform">{template.preview}</span>
+                <div key={template.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden hover:border-gray-300 hover:shadow-xl hover:shadow-gray-200/50 transition-all group">
+                  <div className="h-48 bg-gradient-to-br from-gray-50 via-white to-gray-100 flex items-center justify-center relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/30 to-purple-50/30 group-hover:from-indigo-100/40 group-hover:to-purple-100/40 transition-colors" />
+                    <span className="text-6xl relative z-10 group-hover:scale-125 transition-transform duration-300">{template.preview}</span>
                   </div>
-                  <div className="p-5">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-semibold text-base text-black">{template.name}</h3>
-                      <span className="text-xs px-2 py-1 bg-gray-100 rounded-full text-gray-600">{template.category}</span>
+                  <div className="p-6">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-bold text-lg text-black">{template.name}</h3>
+                      <span className="text-xs px-3 py-1 bg-gray-100 rounded-full text-gray-600 font-medium">{template.category}</span>
                     </div>
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">{template.description}</p>
+                    <p className="text-sm text-gray-600 mb-5 line-clamp-2 leading-relaxed">{template.description}</p>
                     <button
                       onClick={() => {
                         setView('landing');
@@ -311,7 +334,7 @@ function LandingView() {
                           simulateGeneration(template.prompt);
                         }, 100);
                       }}
-                      className="w-full py-2 text-sm font-medium text-black bg-gray-100 rounded-lg hover:bg-gray-200 transition"
+                      className="w-full py-2.5 text-sm font-semibold text-black bg-gray-100 rounded-lg hover:bg-gray-200 transition"
                     >
                       Use Template
                     </button>
