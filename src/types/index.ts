@@ -87,7 +87,7 @@ export interface HistoryState {
 }
 
 export type ViewMode = 'desktop' | 'tablet' | 'mobile';
-export type AppView = 'landing' | 'builder' | 'dashboard' | 'templates' | 'pricing';
+export type AppView = 'landing' | 'builder' | 'dashboard' | 'templates' | 'pricing' | 'admin';
 export type BuilderTab = 'preview' | 'code' | 'seo' | 'theme';
 
 export interface Template {
