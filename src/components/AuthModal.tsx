@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Mail, Lock, User, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react';
-import { supabase, signUp, signIn, sendOTP, verifyOTP, getUserProfile, type UserRole } from '../lib/supabase';
+import { supabase, signUp, signIn, sendOTP, verifyOTP, getUserProfile, signInWithGoogle, type UserRole } from '../lib/supabase';
 
 interface AuthModalProps {
   isOpen: boolean;
