@@ -34,7 +34,49 @@ VITE_SUPABASE_ANON_KEY=your-anon-public-key-here
 - Replace `your-anon-public-key-here` with your actual anon key
 - Never commit `.env` to Git (it's already in `.gitignore`)
 
-## Step 4: Create Database Tables
+## Step 4: Configure Google OAuth (Optional)
+
+To enable Google Sign-In, you need to set up Google OAuth credentials:
+
+### 4.1: Create Google OAuth Credentials
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select an existing one
+3. Go to **APIs & Services** → **Credentials**
+4. Click **Create Credentials** → **OAuth client ID**
+5. If prompted, configure the **OAuth consent screen**:
+   - Choose **External** user type
+   - Fill in the required app information
+   - Add your email under **Test users** (for testing)
+6. For **Application type**, select **Web application**
+7. Add a name for your OAuth client (e.g., "SiteForge AI")
+8. Under **Authorized redirect URIs**, add:
+   ```
+   https://your-project-id.supabase.co/auth/v1/callback
+   ```
+   (Replace `your-project-id` with your actual Supabase project ID)
+9. Click **Create**
+10. Copy your **Client ID** and **Client Secret**
+
+### 4.2: Add Google Provider in Supabase
+
+1. In your Supabase dashboard, go to **Authentication** → **Providers**
+2. Click on **Google**
+3. Enable the **Enable Google provider** toggle
+4. Paste your **Client ID** and **Client Secret** from Google Cloud Console
+5. Click **Save**
+
+### 4.3: Test Google Sign-In
+
+1. Go to your SiteForge AI application
+2. Click **Sign In** or **Sign Up**
+3. Click the **Continue with Google** button
+4. You should be redirected to Google's OAuth consent screen
+5. After approving, you'll be redirected back to your app and logged in
+
+**Note**: Google Sign-In automatically creates a user profile with the `user` role. You can manually promote users to `admin` in the Supabase dashboard if needed.
+
+## Step 5: Create Database Tables
 
 Go to **SQL Editor** in your Supabase dashboard and run the following SQL:
 
@@ -123,7 +165,7 @@ CREATE TRIGGER set_updated_at
   FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 ```
 
-## Step 5: Configure Email Templates (Optional)
+## Step 6: Configure Email Templates (Optional)
 
 To customize the OTP email template:
 
@@ -138,7 +180,7 @@ To customize the OTP email template:
 <p>If you didn't request this, please ignore this email.</p>
 ```
 
-## Step 6: Configure Authentication Settings
+## Step 7: Configure Authentication Settings
 
 1. Go to **Authentication** → **Providers**
 2. Ensure **Email** provider is enabled
@@ -146,7 +188,7 @@ To customize the OTP email template:
    - Confirm email: Enabled
    - OTP expiry: 3600 seconds (1 hour)
 
-## Step 7: Create Your First Admin User
+## Step 8: Create Your First Admin User
 
 After setting up the database, you'll need to create your first admin user:
 
@@ -164,7 +206,7 @@ SET role = 'admin'
 WHERE email = 'your-email@example.com';
 ```
 
-## Step 8: Test the Authentication Flow
+## Step 9: Test the Authentication Flow
 
 ### Registration Flow (Email OTP):
 1. Click "Sign Up" on the landing page
@@ -184,7 +226,7 @@ WHERE email = 'your-email@example.com';
 3. View all users and their roles
 4. Change user roles (promote to admin or demote to user)
 
-## Step 9: Security Best Practices
+## Step 10: Security Best Practices
 
 ### Enable 2FA (Optional but Recommended)
 1. Go to **Authentication** → **Settings**

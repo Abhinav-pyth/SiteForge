@@ -8,6 +8,7 @@ SiteForge AI now includes a complete authentication system powered by Supabase w
 
 - ✅ **Email OTP Registration** - Users register via email and receive a one-time password
 - ✅ **Email/Password Login** - Traditional login with email and password
+- ✅ **Google Sign-In** - Quick authentication with Google account
 - ✅ **Role-Based Access Control** - Admin and regular user roles
 - ✅ **Admin Dashboard** - Manage users and assign roles
 - ✅ **Protected Routes** - Secure access to features based on authentication state
@@ -43,6 +44,17 @@ SiteForge AI now includes a complete authentication system powered by Supabase w
 3. Supabase validates credentials
 4. User is logged in and redirected to the dashboard
 5. User profile is loaded from the `profiles` table
+
+### Google Sign-In Flow (OAuth)
+1. User clicks "Continue with Google" button on login or register page
+2. User is redirected to Google's OAuth consent screen
+3. User selects their Google account and grants permission
+4. Supabase handles the OAuth callback and creates/updates the user account
+5. A profile is automatically created in the `profiles` table with role='user'
+6. User is redirected back to the app and logged in automatically
+7. User's name and email are populated from their Google account
+
+**Note**: Google Sign-In works for both new users (creates account) and existing users (links to existing account if email matches).
 
 ### Session Persistence
 - Supabase automatically manages session tokens
