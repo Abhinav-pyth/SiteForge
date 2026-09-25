@@ -22,9 +22,11 @@ interface AppState {
   showAddSection: boolean;
   showThemePanel: boolean;
   showExportMenu: boolean;
+  showMobileChat: boolean;
   toasts: Toast[];
   isAuthenticated: boolean;
   showAuthModal: boolean;
+  lastSaved: string | null;
 }
 
 interface Toast {
@@ -51,9 +53,11 @@ let state: AppState = {
   showAddSection: false,
   showThemePanel: false,
   showExportMenu: false,
+  showMobileChat: false,
   toasts: [],
   isAuthenticated: false,
   showAuthModal: false,
+  lastSaved: null,
 };
 
 type Listener = () => void;
@@ -145,18 +149,27 @@ export function redo() {
   }
 }
 
-export function saveProject() {
+export function saveProject(showToast = true) {
   if (state.currentProject) {
     const updated = { ...state.currentProject, updatedAt: new Date().toISOString() };
     const projects = state.projects.map(p => p.id === updated.id ? updated : p);
     if (!projects.find(p => p.id === updated.id)) {
       projects.push(updated);
     }
-    setState({ projects, currentProject: updated });
+    setState({ projects, currentProject: updated, lastSaved: new Date().toISOString() });
     saveProjects(projects);
     saveCurrentProject(updated);
-    addToast('Project saved!', 'success');
+    if (showToast) addToast('Project saved!', 'success');
   }
+}
+
+// Auto-save: called after any website update
+let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+export function autoSave() {
+  if (autoSaveTimer) clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(() => {
+    saveProject(false);
+  }, 1500);
 }
 
 export function deleteProject(id: string) {

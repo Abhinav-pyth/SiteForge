@@ -335,115 +335,125 @@ export function modifyWebsite(current: WebsiteConfig, instruction: string): Webs
   const lower = instruction.toLowerCase();
   const modified = JSON.parse(JSON.stringify(current)) as WebsiteConfig;
 
-  // Theme changes
-  if (lower.includes('dark') && (lower.includes('background') || lower.includes('mode') || lower.includes('theme'))) {
+  // === THEME / MODE CHANGES ===
+  if (lower.includes('dark') && (lower.includes('background') || lower.includes('mode') || lower.includes('theme') || lower.includes('make it'))) {
     modified.themeSettings.mode = 'dark';
-    modified.themeSettings.backgroundColor = '#0f0f23';
-    modified.themeSettings.textColor = '#e2e8f0';
-  } else if (lower.includes('light') && (lower.includes('background') || lower.includes('mode') || lower.includes('theme'))) {
+    modified.themeSettings.backgroundColor = '#111827';
+    modified.themeSettings.textColor = '#f3f4f6';
+  }
+  if (lower.includes('light') && (lower.includes('background') || lower.includes('mode') || lower.includes('theme') || lower.includes('make it'))) {
     modified.themeSettings.mode = 'light';
     modified.themeSettings.backgroundColor = '#ffffff';
-    modified.themeSettings.textColor = '#1a1a1a';
+    modified.themeSettings.textColor = '#111827';
   }
 
-  // Color changes
-  if (lower.includes('blue')) {
+  // === COLOR SCHEME CHANGES ===
+  const colorMap: Record<string, { primary: string; secondary: string }> = {
+    'blue': { primary: '#3b82f6', secondary: '#60a5fa' },
+    'red': { primary: '#ef4444', secondary: '#f87171' },
+    'green': { primary: '#22c55e', secondary: '#4ade80' },
+    'purple': { primary: '#8b5cf6', secondary: '#a78bfa' },
+    'violet': { primary: '#8b5cf6', secondary: '#a78bfa' },
+    'pink': { primary: '#ec4899', secondary: '#f472b6' },
+    'orange': { primary: '#f97316', secondary: '#fb923c' },
+    'gold': { primary: '#c9a96e', secondary: '#1a1a2e' },
+    'golden': { primary: '#c9a96e', secondary: '#1a1a2e' },
+    'teal': { primary: '#14b8a6', secondary: '#2dd4bf' },
+    'yellow': { primary: '#eab308', secondary: '#facc15' },
+    'indigo': { primary: '#6366f1', secondary: '#818cf8' },
+  };
+  for (const [colorName, colors] of Object.entries(colorMap)) {
+    if (lower.includes(colorName)) {
+      modified.themeSettings.primaryColor = colors.primary;
+      modified.themeSettings.secondaryColor = colors.secondary;
+      break;
+    }
+  }
+
+  // "white and blue" style
+  if (lower.includes('white') && lower.includes('blue')) {
     modified.themeSettings.primaryColor = '#3b82f6';
-  } else if (lower.includes('red')) {
-    modified.themeSettings.primaryColor = '#ef4444';
-  } else if (lower.includes('green')) {
-    modified.themeSettings.primaryColor = '#22c55e';
-  } else if (lower.includes('purple') || lower.includes('violet')) {
-    modified.themeSettings.primaryColor = '#8b5cf6';
-  } else if (lower.includes('pink')) {
-    modified.themeSettings.primaryColor = '#ec4899';
-  } else if (lower.includes('orange')) {
-    modified.themeSettings.primaryColor = '#f97316';
-  } else if (lower.includes('gold') || lower.includes('golden')) {
-    modified.themeSettings.primaryColor = '#c9a96e';
-    modified.themeSettings.secondaryColor = '#1a1a2e';
+    modified.themeSettings.backgroundColor = '#ffffff';
+    modified.themeSettings.textColor = '#1e293b';
   }
 
-  // Font changes
-  if (lower.includes('modern font') || lower.includes('modern style font')) {
+  // === FONT CHANGES ===
+  if (lower.includes('modern font') || lower.includes('modern style font') || lower.includes('sans-serif') || lower.includes('sans serif')) {
     modified.themeSettings.fontFamily = 'Inter';
-  } else if (lower.includes('serif') || lower.includes('elegant font')) {
+  } else if (lower.includes('serif') || lower.includes('elegant font') || lower.includes('classic font')) {
     modified.themeSettings.fontFamily = 'Playfair Display';
+  } else if (lower.includes('mono') || lower.includes('monospace') || lower.includes('code font') || lower.includes('developer')) {
+    modified.themeSettings.fontFamily = 'system-ui';
   }
 
-  // Border radius
-  if (lower.includes('rounded') || lower.includes('round')) {
+  // === BORDER RADIUS / BUTTON STYLE ===
+  if (lower.includes('rounded') || lower.includes('round button') || lower.includes('pill')) {
     modified.themeSettings.buttonStyle = 'pill';
     modified.themeSettings.borderRadius = '16px';
-  } else if (lower.includes('sharp') || lower.includes('square')) {
+  } else if (lower.includes('sharp') || lower.includes('square') || lower.includes('angular')) {
     modified.themeSettings.buttonStyle = 'square';
     modified.themeSettings.borderRadius = '0px';
   }
 
-  // Add section
-  if (lower.includes('add') && lower.includes('section')) {
-    const sectionTypes: SectionType[] = ['testimonials', 'faq', 'pricing', 'gallery', 'team', 'stats', 'newsletter', 'cta', 'contact', 'features'];
-    for (const type of sectionTypes) {
-      if (lower.includes(type)) {
-        const newSection = generateSectionConfig(type, modified.siteName, modified.industry);
-        const footerIdx = modified.sections.findIndex(s => s.type === 'footer');
-        if (footerIdx >= 0) {
-          modified.sections.splice(footerIdx, 0, newSection);
-        } else {
-          modified.sections.push(newSection);
+  // === ADD SECTION ===
+  const addableSections: SectionType[] = ['testimonials', 'faq', 'pricing', 'gallery', 'team', 'stats', 'newsletter', 'cta', 'contact', 'features', 'about', 'services', 'products'];
+  const isAddCommand = lower.includes('add') || lower.includes('include') || lower.includes('insert') || lower.includes('put');
+  if (isAddCommand) {
+    for (const type of addableSections) {
+      if (lower.includes(type.replace('-', '')) || lower.includes(type)) {
+        // Check if already exists
+        const exists = modified.sections.some(s => s.type === type);
+        if (!exists) {
+          const newSection = generateSectionConfig(type, modified.siteName, modified.industry);
+          const footerIdx = modified.sections.findIndex(s => s.type === 'footer');
+          if (footerIdx >= 0) {
+            modified.sections.splice(footerIdx, 0, newSection);
+          } else {
+            modified.sections.push(newSection);
+          }
         }
         break;
       }
     }
-    // Generic add
-    if (!sectionTypes.some(t => lower.includes(t))) {
-      if (lower.includes('testimonial')) {
-        const newSection = generateSectionConfig('testimonials', modified.siteName, modified.industry);
-        modified.sections.splice(modified.sections.length - 1, 0, newSection);
-      } else if (lower.includes('faq')) {
-        const newSection = generateSectionConfig('faq', modified.siteName, modified.industry);
-        modified.sections.splice(modified.sections.length - 1, 0, newSection);
-      } else if (lower.includes('contact')) {
-        const newSection = generateSectionConfig('contact', modified.siteName, modified.industry);
-        modified.sections.splice(modified.sections.length - 1, 0, newSection);
-      } else if (lower.includes('gallery')) {
-        const newSection = generateSectionConfig('gallery', modified.siteName, modified.industry);
-        modified.sections.splice(modified.sections.length - 1, 0, newSection);
-      }
-    }
   }
 
-  // Remove section
-  if (lower.includes('remove') || lower.includes('delete')) {
-    const sectionTypes: SectionType[] = ['testimonials', 'faq', 'pricing', 'gallery', 'team', 'stats', 'newsletter', 'cta', 'contact', 'features', 'about', 'services', 'products'];
-    for (const type of sectionTypes) {
-      if (lower.includes(type)) {
+  // === REMOVE SECTION ===
+  const isRemoveCommand = lower.includes('remove') || lower.includes('delete') || lower.includes('take out') || lower.includes('drop');
+  if (isRemoveCommand) {
+    for (const type of addableSections) {
+      if (lower.includes(type.replace('-', '')) || lower.includes(type)) {
         modified.sections = modified.sections.filter(s => s.type !== type);
         break;
       }
     }
   }
 
-  // Change headline
-  if (lower.includes('headline') || lower.includes('title') || lower.includes('heading')) {
+  // === CHANGE HEADLINE / TITLE ===
+  if (lower.includes('headline') || lower.includes('heading') || lower.includes('main title')) {
     const heroSection = modified.sections.find(s => s.type === 'hero');
     if (heroSection) {
-      const match = instruction.match(/(?:headline|title|heading)\s+(?:to|as|:)\s*["']?([^"']+?)["']?$/i);
+      // Try to extract the new title from the instruction
+      const match = instruction.match(/(?:headline|heading|title)\s+(?:to|as|:|is)\s*["']?(.+?)["']?\.?\s*$/i);
       if (match) {
         heroSection.config.title = match[1].trim();
-      } else {
-        heroSection.config.title = heroSection.config.title + ' ✨';
       }
     }
   }
 
-  // Premium/luxury style
-  if (lower.includes('premium') || lower.includes('luxury') || lower.includes('more elegant')) {
-    modified.themeSettings.preset = 'luxury';
-    modified.themeSettings.fontFamily = 'Playfair Display';
-    modified.themeSettings.spacing = 'spacious';
-    modified.themeSettings.primaryColor = '#1a1a2e';
-    modified.themeSettings.secondaryColor = '#c9a96e';
+  // === CHANGE BUTTON TEXT ===
+  if (lower.includes('button') && (lower.includes('text') || lower.includes('say') || lower.includes('call'))) {
+    const heroSection = modified.sections.find(s => s.type === 'hero');
+    if (heroSection) {
+      const match = instruction.match(/(?:button|cta)\s+(?:text|to|say|call)\s+(?:to|as|:)?\s*["']?(.+?)["']?\.?\s*$/i);
+      if (match) {
+        heroSection.config.buttonText = match[1].trim();
+      }
+    }
+  }
+
+  // === STYLE PRESETS ===
+  if (lower.includes('premium') || lower.includes('luxury') || lower.includes('high-end') || lower.includes('upscale')) {
+    Object.assign(modified.themeSettings, THEME_PRESETS['luxury']);
     const hero = modified.sections.find(s => s.type === 'hero');
     if (hero) {
       hero.config.alignment = 'center';
@@ -451,15 +461,31 @@ export function modifyWebsite(current: WebsiteConfig, instruction: string): Webs
     }
   }
 
-  // Professional
-  if (lower.includes('professional') || lower.includes('corporate')) {
-    modified.themeSettings.preset = 'corporate';
-    modified.themeSettings.fontFamily = 'Inter';
-    modified.themeSettings.primaryColor = '#1e40af';
-    modified.themeSettings.secondaryColor = '#3b82f6';
+  if (lower.includes('minimal') || lower.includes('minimalist') || lower.includes('simple') || lower.includes('clean')) {
+    Object.assign(modified.themeSettings, THEME_PRESETS['minimal']);
   }
 
-  // Mobile improvements
+  if (lower.includes('professional') || lower.includes('corporate') || lower.includes('business-like')) {
+    Object.assign(modified.themeSettings, THEME_PRESETS['corporate']);
+  }
+
+  if (lower.includes('creative') || lower.includes('artistic') || lower.includes('colorful')) {
+    Object.assign(modified.themeSettings, THEME_PRESETS['creative']);
+  }
+
+  if (lower.includes('bold') || lower.includes('strong') || lower.includes('impactful')) {
+    Object.assign(modified.themeSettings, THEME_PRESETS['bold']);
+  }
+
+  if (lower.includes('modern') && (lower.includes('saas') || lower.includes('tech') || lower.includes('startup') || lower.includes('look'))) {
+    Object.assign(modified.themeSettings, THEME_PRESETS['modern']);
+  }
+
+  if (lower.includes('elegant') || lower.includes('sophisticated') || lower.includes('refined')) {
+    Object.assign(modified.themeSettings, THEME_PRESETS['elegant']);
+  }
+
+  // === MOBILE IMPROVEMENTS ===
   if (lower.includes('mobile')) {
     modified.themeSettings.spacing = 'compact';
     modified.sections.forEach(s => {
@@ -469,11 +495,47 @@ export function modifyWebsite(current: WebsiteConfig, instruction: string): Webs
     });
   }
 
-  // Spacing
-  if (lower.includes('more space') || lower.includes('spacious') || lower.includes('breathing room')) {
+  // === SPACING ===
+  if (lower.includes('more space') || lower.includes('spacious') || lower.includes('breathing room') || lower.includes('bigger gaps')) {
     modified.themeSettings.spacing = 'spacious';
-  } else if (lower.includes('compact') || lower.includes('less space') || lower.includes('tighter')) {
+  } else if (lower.includes('compact') || lower.includes('less space') || lower.includes('tighter') || lower.includes('smaller gaps')) {
     modified.themeSettings.spacing = 'compact';
+  }
+
+  // === HERO ALIGNMENT ===
+  if (lower.includes('center') && (lower.includes('hero') || lower.includes('align') || lower.includes('text'))) {
+    const hero = modified.sections.find(s => s.type === 'hero');
+    if (hero) hero.config.alignment = 'center';
+  }
+  if (lower.includes('left') && (lower.includes('hero') || lower.includes('align') || lower.includes('text'))) {
+    const hero = modified.sections.find(s => s.type === 'hero');
+    if (hero) hero.config.alignment = 'left';
+  }
+
+  // === HERO BACKGROUND ===
+  if (lower.includes('gradient') && lower.includes('hero')) {
+    const hero = modified.sections.find(s => s.type === 'hero');
+    if (hero) hero.config.backgroundStyle = 'gradient';
+  }
+  if (lower.includes('dark hero') || (lower.includes('dark') && lower.includes('hero'))) {
+    const hero = modified.sections.find(s => s.type === 'hero');
+    if (hero) hero.config.backgroundStyle = 'dark';
+  }
+
+  // === RENAME SITE ===
+  const renameMatch = instruction.match(/(?:rename|call|name)\s+(?:it|the site|the website)?\s*(?:to|as)?\s*["']?(\w+(?:\s+\w+)?)["']?/i);
+  if (renameMatch && (lower.includes('rename') || lower.includes('call it') || lower.includes('name it'))) {
+    const newName = renameMatch[1].trim();
+    modified.siteName = newName;
+    // Update navbar
+    const navbar = modified.sections.find(s => s.type === 'navbar');
+    if (navbar) navbar.config.brandName = newName;
+    // Update footer
+    const footer = modified.sections.find(s => s.type === 'footer');
+    if (footer) {
+      footer.config.brandName = newName;
+      footer.config.description = `© ${new Date().getFullYear()} ${newName}. All rights reserved.`;
+    }
   }
 
   return modified;
@@ -482,45 +544,104 @@ export function modifyWebsite(current: WebsiteConfig, instruction: string): Webs
 export function generateAIResponse(instruction: string, website: WebsiteConfig): string {
   const lower = instruction.toLowerCase();
 
-  if (lower.includes('dark') && (lower.includes('background') || lower.includes('mode'))) {
-    return "I've switched your website to a dark theme. The background is now dark with light text for better contrast and a modern look.";
+  // Dark/light mode
+  if (lower.includes('dark') && (lower.includes('background') || lower.includes('mode') || lower.includes('theme') || lower.includes('make it'))) {
+    return "Done. I've switched your website to a dark theme with better contrast for a modern look.";
   }
-  if (lower.includes('light') && (lower.includes('background') || lower.includes('mode'))) {
-    return "I've switched to a light theme. Clean and bright for a professional appearance.";
-  }
-  if (lower.includes('color') || lower.includes('blue') || lower.includes('red') || lower.includes('green') || lower.includes('purple') || lower.includes('pink') || lower.includes('orange') || lower.includes('gold')) {
-    const color = ['blue', 'red', 'green', 'purple', 'pink', 'orange', 'gold'].find(c => lower.includes(c)) || 'primary';
-    return `I've updated the color scheme to ${color}. The primary accent color now reflects this throughout your website.`;
-  }
-  if (lower.includes('add') && lower.includes('section')) {
-    return "I've added the new section to your website. You can see it in the preview and customize it further if needed.";
-  }
-  if (lower.includes('remove') || lower.includes('delete')) {
-    return "I've removed that section from your website. The layout has been adjusted accordingly.";
-  }
-  if (lower.includes('premium') || lower.includes('luxury')) {
-    return "I've elevated the design with a more premium feel — using elegant typography, luxurious spacing, and refined color palette.";
-  }
-  if (lower.includes('professional') || lower.includes('corporate')) {
-    return "I've updated the design to look more professional and corporate — clean typography, structured layout, and business-appropriate colors.";
-  }
-  if (lower.includes('mobile')) {
-    return "I've optimized the mobile experience with better spacing, centered content, and improved touch targets.";
-  }
-  if (lower.includes('rounded') || lower.includes('round')) {
-    return "I've made the buttons and elements more rounded for a softer, modern appearance.";
-  }
-  if (lower.includes('font') || lower.includes('typography')) {
-    return "I've updated the typography. The new font style gives your website a fresh, modern feel.";
-  }
-  if (lower.includes('headline') || lower.includes('title')) {
-    return "I've updated the headline. It now better captures your brand's message.";
-  }
-  if (lower.includes('modern') || lower.includes('saas')) {
-    return "I've given your website a modern SaaS look with clean lines, bold typography, and a contemporary color scheme.";
+  if (lower.includes('light') && (lower.includes('background') || lower.includes('mode') || lower.includes('theme') || lower.includes('make it'))) {
+    return "Done. Switched to a clean light theme.";
   }
 
-  return "I've made the changes you requested. Take a look at the preview to see the updates. Let me know if you'd like any further adjustments!";
+  // Colors
+  const colors = ['blue', 'red', 'green', 'purple', 'violet', 'pink', 'orange', 'gold', 'golden', 'teal', 'yellow', 'indigo'];
+  const foundColor = colors.find(c => lower.includes(c));
+  if (foundColor && (lower.includes('color') || lower.includes('scheme') || lower.includes('use') || lower.includes('make it'))) {
+    return `Done. Updated the color scheme to ${foundColor}. The accent color now reflects this throughout your site.`;
+  }
+
+  // Add section
+  if ((lower.includes('add') || lower.includes('include') || lower.includes('insert')) && !lower.includes('remove')) {
+    const sectionTypes = ['testimonial', 'faq', 'pricing', 'gallery', 'team', 'stats', 'newsletter', 'cta', 'contact', 'feature', 'about', 'service', 'product'];
+    const found = sectionTypes.find(t => lower.includes(t));
+    if (found) return `Done. Added a ${found} section before the footer. You can customize it in the properties panel.`;
+    return "Done. I've added the new section to your website.";
+  }
+
+  // Remove section
+  if (lower.includes('remove') || lower.includes('delete') || lower.includes('take out')) {
+    const sectionTypes = ['testimonial', 'faq', 'pricing', 'gallery', 'team', 'stats', 'newsletter', 'cta', 'contact', 'feature', 'about', 'service', 'product'];
+    const found = sectionTypes.find(t => lower.includes(t));
+    if (found) return `Done. Removed the ${found} section.`;
+    return "Done. Removed that section from your website.";
+  }
+
+  // Style presets
+  if (lower.includes('premium') || lower.includes('luxury') || lower.includes('high-end')) {
+    return "Done. Applied a luxury aesthetic — elegant serif typography, generous spacing, and a refined gold accent palette.";
+  }
+  if (lower.includes('minimal') || lower.includes('minimalist')) {
+    return "Done. Applied a minimal style — clean lines, lots of whitespace, and simple typography.";
+  }
+  if (lower.includes('professional') || lower.includes('corporate')) {
+    return "Done. Applied a professional corporate style — structured layout with business-appropriate blue tones.";
+  }
+  if (lower.includes('creative') || lower.includes('artistic')) {
+    return "Done. Applied a creative style — bold colors and playful typography.";
+  }
+  if (lower.includes('bold')) {
+    return "Done. Applied a bold style — strong contrast with dark backgrounds and vivid accents.";
+  }
+  if (lower.includes('modern') && (lower.includes('saas') || lower.includes('tech') || lower.includes('look'))) {
+    return "Done. Applied a modern SaaS look — clean indigo accents with contemporary typography.";
+  }
+  if (lower.includes('elegant') || lower.includes('sophisticated')) {
+    return "Done. Applied an elegant style — refined serif typography with muted tones.";
+  }
+
+  // Mobile
+  if (lower.includes('mobile')) {
+    return "Done. Optimized for mobile with compact spacing and centered content.";
+  }
+
+  // Rounded / sharp
+  if (lower.includes('rounded') || lower.includes('pill')) {
+    return "Done. Buttons and elements are now rounded with a softer appearance.";
+  }
+  if (lower.includes('sharp') || lower.includes('square') || lower.includes('angular')) {
+    return "Done. Switched to sharp, angular elements for a more structured look.";
+  }
+
+  // Font
+  if (lower.includes('font') || lower.includes('typography')) {
+    return "Done. Updated the typography across the site.";
+  }
+
+  // Headline
+  if (lower.includes('headline') || lower.includes('heading')) {
+    return "Done. Updated the hero headline.";
+  }
+
+  // Button
+  if (lower.includes('button')) {
+    return "Done. Updated the button text.";
+  }
+
+  // Rename
+  if (lower.includes('rename') || lower.includes('call it') || lower.includes('name it')) {
+    return `Done. Updated the site name to "${website.siteName}" across the navbar and footer.`;
+  }
+
+  // Spacing
+  if (lower.includes('space') || lower.includes('spacious') || lower.includes('compact') || lower.includes('breathing')) {
+    return "Done. Updated the spacing throughout the site.";
+  }
+
+  // Alignment
+  if (lower.includes('center') || lower.includes('align')) {
+    return "Done. Updated the text alignment.";
+  }
+
+  return "Done. I've applied your changes. Check the preview to see the updates. Let me know if you'd like further adjustments!";
 }
 
 export function generateSection(type: SectionType, siteName: string, industry: string): Section {

@@ -2,11 +2,14 @@ import { useState, useEffect, useRef } from 'react';
 import {
   Sparkles, Monitor, Tablet, Smartphone, Code, Download, Send, Plus,
   Undo2, Redo2, Save, Trash2, Copy, ChevronUp, ChevronDown, X, Check,
-  Palette, Settings, Globe, Layout, Layers, ArrowLeft,
-  Rocket, FileCode, Grid3X3, CreditCard,
+  Palette, Settings, Globe, Layout, Layers, ArrowLeft, GripVertical,
+  Rocket, FileCode, Grid3X3, CreditCard, MessageCircle,
   FolderOpen, Edit3,
   Clock, CheckCircle2, AlertCircle, Info, Moon, Sun
 } from 'lucide-react';
+import { DndContext, DragEndEvent, closestCenter } from '@dnd-kit/core';
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import {
   WebsiteConfig, Section, SectionType, Project, ChatMessage,
   ViewMode, ThemeSettings, THEME_PRESETS
@@ -15,7 +18,7 @@ import { generateWebsite, modifyWebsite, generateAIResponse, generateSection } f
 import {
   getState, subscribe, setState, initializeStore, pushHistory, undo, redo,
   saveProject, deleteProject, duplicateProject, renameProject, updateWebsite,
-  selectSection, setView, setViewMode, updateTheme, addToast
+  selectSection, setView, setViewMode, updateTheme, addToast, autoSave
 } from './lib/store';
 import { generateFullHTML, generateReactCode, downloadHTML, downloadJSON } from './lib/export';
 import { templates, examplePrompts } from './lib/templates';
@@ -27,6 +30,18 @@ function useStore() {
     return subscribe(() => setLocalState({ ...getState() }));
   }, []);
   return state;
+}
+
+function getTimeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const seconds = Math.floor(diff / 1000);
+  if (seconds < 5) return 'just now';
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
 }
 
 export default function App() {
@@ -284,14 +299,31 @@ function BuilderView() {
   if (!state.currentProject) return null;
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col relative">
       <TopNav />
       <BuilderToolbar />
       <div className="flex-1 flex overflow-hidden">
-        <ChatPanel />
+        {/* Desktop chat panel */}
+        <div className="hidden md:flex">
+          <ChatPanel />
+        </div>
         <PreviewPanel />
         <PropertiesPanel />
       </div>
+      {/* Mobile chat overlay */}
+      {state.showMobileChat && (
+        <div className="fixed inset-0 z-40 md:hidden bg-white flex flex-col">
+          <div className="h-11 border-b border-gray-200 flex items-center justify-between px-3">
+            <span className="text-sm font-medium">AI Chat</span>
+            <button onClick={() => setState({ showMobileChat: false })} className="p-1 hover:bg-gray-100 rounded">
+              <X size={16} />
+            </button>
+          </div>
+          <div className="flex-1 overflow-hidden">
+            <ChatPanelInner />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -299,6 +331,11 @@ function BuilderView() {
 // ============ BUILDER TOOLBAR ============
 function BuilderToolbar() {
   const state = useStore();
+
+  const savedLabel = state.lastSaved
+    ? `Saved ${getTimeAgo(state.lastSaved)}`
+    : null;
+
   return (
     <div className="h-11 border-b border-gray-200 bg-white flex items-center justify-between px-3 shrink-0">
       <div className="flex items-center gap-1">
@@ -306,15 +343,26 @@ function BuilderToolbar() {
           <ArrowLeft size={15} />
         </button>
         <div className="w-px h-4 bg-gray-200 mx-1" />
-        <button onClick={undo} className="p-1.5 rounded hover:bg-gray-100 text-gray-500" title="Undo">
+        <button onClick={undo} className="p-1.5 rounded hover:bg-gray-100 text-gray-500" title="Undo (Ctrl+Z)">
           <Undo2 size={15} />
         </button>
-        <button onClick={redo} className="p-1.5 rounded hover:bg-gray-100 text-gray-500" title="Redo">
+        <button onClick={redo} className="p-1.5 rounded hover:bg-gray-100 text-gray-500" title="Redo (Ctrl+Shift+Z)">
           <Redo2 size={15} />
         </button>
         <div className="w-px h-4 bg-gray-200 mx-1" />
-        <button onClick={saveProject} className="p-1.5 rounded hover:bg-gray-100 text-gray-500" title="Save">
+        <button onClick={() => saveProject()} className="p-1.5 rounded hover:bg-gray-100 text-gray-500" title="Save (Ctrl+S)">
           <Save size={15} />
+        </button>
+        {savedLabel && (
+          <span className="text-[10px] text-gray-400 ml-1 hidden sm:inline">{savedLabel}</span>
+        )}
+        {/* Mobile chat toggle */}
+        <button
+          onClick={() => setState({ showMobileChat: !state.showMobileChat })}
+          className={`p-1.5 rounded text-gray-500 md:hidden ${state.showMobileChat ? 'bg-gray-100 text-black' : 'hover:bg-gray-100'}`}
+          title="AI Chat"
+        >
+          <MessageCircle size={15} />
         </button>
       </div>
 
@@ -358,8 +406,8 @@ function BuilderToolbar() {
   );
 }
 
-// ============ CHAT PANEL ============
-function ChatPanel() {
+// ============ CHAT PANEL INNER ============
+function ChatPanelInner() {
   const state = useStore();
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -382,22 +430,14 @@ function ChatPanel() {
       const aiMsg: ChatMessage = { id: `msg_${Date.now() + 1}`, role: 'assistant', content: response, timestamp: new Date().toISOString() };
       updateWebsite(modified);
       pushHistory(modified, `AI: ${input}`);
+      autoSave();
       setState({ chatMessages: [...getState().chatMessages, aiMsg] });
       setIsTyping(false);
     }, 800);
   };
 
   return (
-    <div className="w-72 border-r border-gray-200 bg-white flex flex-col shrink-0 hidden lg:flex">
-      <div className="p-3 border-b border-gray-100 flex items-center gap-2">
-        <div className="w-6 h-6 bg-black rounded flex items-center justify-center">
-          <Sparkles size={12} className="text-white" />
-        </div>
-        <div>
-          <h3 className="text-xs font-medium text-black">AI Assistant</h3>
-          <p className="text-[10px] text-gray-400">Ask to modify your site</p>
-        </div>
-      </div>
+    <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
         {state.chatMessages.map(msg => (
           <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -425,7 +465,7 @@ function ChatPanel() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') handleSend(); }}
-            placeholder="Ask AI..."
+            placeholder="Ask AI to modify..."
             className="flex-1 px-2.5 py-1.5 text-xs border border-gray-200 rounded-md outline-none focus:border-gray-400"
           />
           <button onClick={handleSend} disabled={!input.trim()} className="p-1.5 bg-black text-white rounded-md hover:bg-gray-800 disabled:opacity-30">
@@ -433,13 +473,67 @@ function ChatPanel() {
           </button>
         </div>
         <div className="flex flex-wrap gap-1 mt-2">
-          {['Make it dark', 'Add testimonials', 'Change to blue'].map(s => (
+          {['Make it dark', 'Add testimonials', 'Change to blue', 'Make it minimal'].map(s => (
             <button key={s} onClick={() => setInput(s)} className="text-[10px] px-2 py-0.5 bg-gray-50 border border-gray-200 rounded text-gray-500 hover:border-gray-400 hover:text-black">
               {s}
             </button>
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ============ CHAT PANEL (Desktop sidebar) ============
+function ChatPanel() {
+  const state = useStore();
+  return (
+    <div className="w-72 border-r border-gray-200 bg-white flex flex-col shrink-0">
+      <div className="p-3 border-b border-gray-100 flex items-center gap-2">
+        <div className="w-6 h-6 bg-black rounded flex items-center justify-center">
+          <Sparkles size={12} className="text-white" />
+        </div>
+        <div>
+          <h3 className="text-xs font-medium text-black">AI Assistant</h3>
+          <p className="text-[10px] text-gray-400">Ask to modify your site</p>
+        </div>
+      </div>
+      <ChatPanelInner />
+    </div>
+  );
+}
+
+// ============ SORTABLE SECTION WRAPPER ============
+function SortableSection({ section, theme, isSelected, onSelect }: {
+  section: Section;
+  theme: any;
+  isSelected: boolean;
+  onSelect: (id: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: section.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    position: 'relative' as const,
+    zIndex: isDragging ? 50 : 'auto' as any,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes}>
+      {/* Drag handle overlay */}
+      <div
+        className="absolute left-0 top-0 bottom-0 w-6 z-40 cursor-grab active:cursor-grabbing flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-black/5"
+        {...listeners}
+      >
+        <GripVertical size={12} className="text-gray-400" />
+      </div>
+      <SectionRenderer
+        section={section}
+        theme={theme}
+        isSelected={isSelected}
+        onSelect={onSelect}
+      />
     </div>
   );
 }
@@ -454,6 +548,20 @@ function PreviewPanel() {
   }
 
   const widthClass = state.viewMode === 'desktop' ? 'preview-desktop' : state.viewMode === 'tablet' ? 'preview-tablet' : 'preview-mobile';
+  const sections = state.currentProject.website.sections;
+  const theme = state.currentProject.website.themeSettings;
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const website = JSON.parse(JSON.stringify(state.currentProject!.website)) as WebsiteConfig;
+    const oldIndex = website.sections.findIndex(s => s.id === active.id);
+    const newIndex = website.sections.findIndex(s => s.id === over.id);
+    website.sections = arrayMove(website.sections, oldIndex, newIndex);
+    updateWebsite(website);
+    pushHistory(website, 'Reorder sections');
+  };
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
@@ -472,17 +580,21 @@ function PreviewPanel() {
               </div>
             </div>
           </div>
-          {/* Website content */}
-          <div className="overflow-auto" style={{ maxHeight: 'calc(100vh - 180px)' }}>
-            {state.currentProject.website.sections.map(section => (
-              <SectionRenderer
-                key={section.id}
-                section={section}
-                theme={state.currentProject!.website.themeSettings}
-                isSelected={state.selectedSectionId === section.id}
-                onSelect={(id) => selectSection(state.selectedSectionId === id ? null : id)}
-              />
-            ))}
+          {/* Website content with drag-and-drop */}
+          <div className="overflow-auto relative" style={{ maxHeight: 'calc(100vh - 180px)' }}>
+            <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={sections.map(s => s.id)} strategy={verticalListSortingStrategy}>
+                {sections.map(section => (
+                  <SortableSection
+                    key={section.id}
+                    section={section}
+                    theme={theme}
+                    isSelected={state.selectedSectionId === section.id}
+                    onSelect={(id) => selectSection(state.selectedSectionId === id ? null : id)}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
           </div>
         </div>
       </div>
@@ -534,14 +646,37 @@ function PropertiesPanel() {
   const selectedSection = state.currentProject.website.sections.find(s => s.id === state.selectedSectionId);
 
   return (
-    <div className="w-64 border-l border-gray-200 bg-white flex flex-col shrink-0 hidden xl:flex">
+    <div className="w-64 border-l border-gray-200 bg-white flex flex-col shrink-0 hidden md:flex">
       {selectedSection ? (
         <SectionEditor section={selectedSection} />
       ) : (
-        <div className="p-4 flex flex-col items-center justify-center h-full text-center">
-          <Layers size={24} className="text-gray-300 mb-2" />
-          <p className="text-xs font-medium text-gray-500">Select a section</p>
-          <p className="text-[10px] text-gray-400 mt-1">Click any section in the preview to edit it.</p>
+        <div className="flex flex-col h-full">
+          {/* Section List */}
+          <div className="p-3 border-b border-gray-100">
+            <h3 className="text-xs font-medium text-black mb-1">Sections</h3>
+            <p className="text-[10px] text-gray-400">Click to select, drag to reorder</p>
+          </div>
+          <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+            {state.currentProject.website.sections.map((section, index) => (
+              <button
+                key={section.id}
+                onClick={() => selectSection(section.id)}
+                className="w-full text-left px-2.5 py-2 rounded text-xs hover:bg-gray-50 flex items-center gap-2 transition"
+              >
+                <GripVertical size={10} className="text-gray-300 shrink-0" />
+                <span className="capitalize text-gray-700 truncate">{section.type.replace('-', ' ')}</span>
+                <span className="text-[10px] text-gray-300 ml-auto">{index + 1}</span>
+              </button>
+            ))}
+          </div>
+          <div className="p-2 border-t border-gray-100">
+            <button
+              onClick={() => setState({ showAddSection: true })}
+              className="w-full py-1.5 text-xs text-gray-500 hover:text-black hover:bg-gray-50 rounded flex items-center justify-center gap-1 transition"
+            >
+              <Plus size={12} /> Add Section
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -556,11 +691,31 @@ function SectionEditor({ section }: { section: Section }) {
   const updateConfig = (key: string, value: any) => {
     const website = JSON.parse(JSON.stringify(state.currentProject!.website)) as WebsiteConfig;
     const sec = website.sections.find(s => s.id === section.id);
-    if (sec) {
+    if (!sec) return;
+
+    // Handle nested array paths like "features[0].title"
+    const arrayMatch = key.match(/^(\w+)\[(\d+)\]\.(\w+)$/);
+    if (arrayMatch) {
+      const [, arrayKey, indexStr, fieldKey] = arrayMatch;
+      const index = parseInt(indexStr, 10);
+      if (Array.isArray(sec.config[arrayKey]) && sec.config[arrayKey][index]) {
+        // Handle comma-separated links
+        if (arrayKey === 'links') {
+          sec.config[arrayKey] = value.split(',').map((s: string) => s.trim());
+        } else {
+          sec.config[arrayKey][index][fieldKey] = value;
+        }
+      }
+    } else if (key === 'links' && typeof value === 'string') {
+      // Handle comma-separated nav links
+      sec.config[key] = value.split(',').map((s: string) => s.trim());
+    } else {
       sec.config[key] = value;
-      updateWebsite(website);
-      pushHistory(website, `Edit ${section.type}: ${key}`);
     }
+
+    updateWebsite(website);
+    pushHistory(website, `Edit ${section.type}: ${key}`);
+    autoSave();
   };
 
   const moveSection = (direction: 'up' | 'down') => {
@@ -573,6 +728,7 @@ function SectionEditor({ section }: { section: Section }) {
     }
     updateWebsite(website);
     pushHistory(website, `Move ${section.type}`);
+    autoSave();
   };
 
   const deleteSection = () => {
@@ -581,6 +737,7 @@ function SectionEditor({ section }: { section: Section }) {
     updateWebsite(website);
     selectSection(null);
     pushHistory(website, `Delete ${section.type}`);
+    autoSave();
     addToast('Section deleted', 'info');
   };
 
@@ -591,6 +748,7 @@ function SectionEditor({ section }: { section: Section }) {
     website.sections.splice(idx + 1, 0, clone);
     updateWebsite(website);
     pushHistory(website, `Duplicate ${section.type}`);
+    autoSave();
     addToast('Duplicated', 'success');
   };
 
@@ -662,17 +820,96 @@ function SectionEditor({ section }: { section: Section }) {
 function getEditableFields(section: Section): { key: string; label: string; type: string; value: any; options?: string[] }[] {
   const fields: { key: string; label: string; type: string; value: any; options?: string[] }[] = [];
   const c = section.config;
+
+  // Top-level text fields
   if (c.title) fields.push({ key: 'title', label: 'Title', type: 'text', value: c.title });
   if (c.subtitle) fields.push({ key: 'subtitle', label: 'Subtitle', type: 'textarea', value: c.subtitle });
   if (c.description) fields.push({ key: 'description', label: 'Description', type: 'textarea', value: c.description });
   if (c.buttonText) fields.push({ key: 'buttonText', label: 'Button Text', type: 'text', value: c.buttonText });
   if (c.secondaryButtonText) fields.push({ key: 'secondaryButtonText', label: 'Secondary Button', type: 'text', value: c.secondaryButtonText });
+  if (c.placeholder) fields.push({ key: 'placeholder', label: 'Placeholder', type: 'text', value: c.placeholder });
+
+  // Select fields
   if (c.alignment) fields.push({ key: 'alignment', label: 'Alignment', type: 'select', value: c.alignment, options: ['left', 'center', 'right'] });
   if (c.backgroundStyle) fields.push({ key: 'backgroundStyle', label: 'Background', type: 'select', value: c.backgroundStyle, options: ['light', 'dark', 'gradient'] });
+
+  // Brand / contact
   if (c.brandName) fields.push({ key: 'brandName', label: 'Brand Name', type: 'text', value: c.brandName });
+  if (c.ctaText) fields.push({ key: 'ctaText', label: 'CTA Text', type: 'text', value: c.ctaText });
   if (c.email) fields.push({ key: 'email', label: 'Email', type: 'text', value: c.email });
   if (c.phone) fields.push({ key: 'phone', label: 'Phone', type: 'text', value: c.phone });
-  if (c.address) fields.push({ key: 'address', label: 'Address', type: 'text', value: c.address });
+  if (c.address) fields.push({ key: 'address', label: 'Address', type: 'textarea', value: c.address });
+
+  // Array items - features
+  if (Array.isArray(c.features) && c.features.length > 0) {
+    c.features.forEach((f: any, i: number) => {
+      fields.push({ key: `features[${i}].title`, label: `Feature ${i + 1} Title`, type: 'text', value: f.title });
+      fields.push({ key: `features[${i}].description`, label: `Feature ${i + 1} Desc`, type: 'textarea', value: f.description });
+    });
+  }
+
+  // Array items - services
+  if (Array.isArray(c.services) && c.services.length > 0) {
+    c.services.forEach((s: any, i: number) => {
+      fields.push({ key: `services[${i}].title`, label: `Service ${i + 1} Title`, type: 'text', value: s.title });
+      fields.push({ key: `services[${i}].description`, label: `Service ${i + 1} Desc`, type: 'textarea', value: s.description });
+    });
+  }
+
+  // Array items - products
+  if (Array.isArray(c.products) && c.products.length > 0) {
+    c.products.forEach((p: any, i: number) => {
+      fields.push({ key: `products[${i}].name`, label: `Product ${i + 1} Name`, type: 'text', value: p.name });
+      fields.push({ key: `products[${i}].price`, label: `Product ${i + 1} Price`, type: 'text', value: p.price });
+    });
+  }
+
+  // Array items - testimonials
+  if (Array.isArray(c.testimonials) && c.testimonials.length > 0) {
+    c.testimonials.forEach((t: any, i: number) => {
+      fields.push({ key: `testimonials[${i}].name`, label: `Testimonial ${i + 1} Name`, type: 'text', value: t.name });
+      fields.push({ key: `testimonials[${i}].role`, label: `Testimonial ${i + 1} Role`, type: 'text', value: t.role });
+      fields.push({ key: `testimonials[${i}].content`, label: `Testimonial ${i + 1} Text`, type: 'textarea', value: t.content });
+    });
+  }
+
+  // Array items - team members
+  if (Array.isArray(c.members) && c.members.length > 0) {
+    c.members.forEach((m: any, i: number) => {
+      fields.push({ key: `members[${i}].name`, label: `Member ${i + 1} Name`, type: 'text', value: m.name });
+      fields.push({ key: `members[${i}].role`, label: `Member ${i + 1} Role`, type: 'text', value: m.role });
+    });
+  }
+
+  // Array items - FAQ questions
+  if (Array.isArray(c.questions) && c.questions.length > 0) {
+    c.questions.forEach((q: any, i: number) => {
+      fields.push({ key: `questions[${i}].question`, label: `FAQ ${i + 1} Q`, type: 'text', value: q.question });
+      fields.push({ key: `questions[${i}].answer`, label: `FAQ ${i + 1} A`, type: 'textarea', value: q.answer });
+    });
+  }
+
+  // Array items - stats
+  if (Array.isArray(c.stats) && c.stats.length > 0) {
+    c.stats.forEach((s: any, i: number) => {
+      fields.push({ key: `stats[${i}].value`, label: `Stat ${i + 1} Value`, type: 'text', value: s.value });
+      fields.push({ key: `stats[${i}].label`, label: `Stat ${i + 1} Label`, type: 'text', value: s.label });
+    });
+  }
+
+  // Array items - pricing plans
+  if (Array.isArray(c.plans) && c.plans.length > 0) {
+    c.plans.forEach((p: any, i: number) => {
+      fields.push({ key: `plans[${i}].name`, label: `Plan ${i + 1} Name`, type: 'text', value: p.name });
+      fields.push({ key: `plans[${i}].price`, label: `Plan ${i + 1} Price`, type: 'text', value: p.price });
+    });
+  }
+
+  // Navbar links
+  if (Array.isArray(c.links) && c.links.length > 0 && typeof c.links[0] === 'string') {
+    fields.push({ key: 'links', label: 'Nav Links (comma-separated)', type: 'text', value: c.links.join(', ') });
+  }
+
   if (fields.length === 0) fields.push({ key: 'title', label: 'Title', type: 'text', value: c.title || section.type });
   return fields;
 }
