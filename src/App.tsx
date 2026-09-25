@@ -83,39 +83,41 @@ export default function App() {
 function TopNav() {
   const state = useStore();
   return (
-    <header className="h-14 border-b border-gray-200 bg-white flex items-center justify-between px-4 shrink-0">
-      <div className="flex items-center gap-6">
-        <button onClick={() => setView('landing')} className="flex items-center gap-2 font-semibold text-base">
-          <div className="w-7 h-7 bg-black rounded-md flex items-center justify-center">
-            <Sparkles size={14} className="text-white" />
-          </div>
-          <span>SiteForge AI</span>
-        </button>
-        <nav className="hidden md:flex items-center gap-1">
-          {[
-            { view: 'dashboard' as const, label: 'Projects', icon: <FolderOpen size={14} /> },
-            { view: 'templates' as const, label: 'Templates', icon: <Grid3X3 size={14} /> },
-            { view: 'pricing' as const, label: 'Pricing', icon: <CreditCard size={14} /> },
-          ].map(item => (
-            <button
-              key={item.view}
-              onClick={() => setView(item.view)}
-              className={`px-3 py-1.5 rounded text-sm flex items-center gap-1.5 transition ${
-                state.view === item.view ? 'bg-gray-100 text-black font-medium' : 'text-gray-500 hover:text-black hover:bg-gray-50'
-              }`}
-            >
-              {item.icon} {item.label}
-            </button>
-          ))}
-        </nav>
-      </div>
-      <div className="flex items-center gap-2">
-        {state.currentProject && state.view === 'builder' && (
-          <span className="text-sm text-gray-500 hidden sm:block">{state.currentProject.name}</span>
-        )}
-        <button onClick={() => setState({ showAuthModal: true })} className="w-8 h-8 rounded-full bg-gray-900 flex items-center justify-center text-white text-xs font-medium">
-          U
-        </button>
+    <header className="border-b border-gray-200 bg-white shrink-0">
+      <div className="max-w-[1400px] mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="flex items-center gap-8">
+          <button onClick={() => setView('landing')} className="flex items-center gap-2 font-semibold text-base">
+            <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
+              <Sparkles size={15} className="text-white" />
+            </div>
+            <span>SiteForge AI</span>
+          </button>
+          <nav className="hidden md:flex items-center gap-1">
+            {[
+              { view: 'dashboard' as const, label: 'Projects', icon: <FolderOpen size={14} /> },
+              { view: 'templates' as const, label: 'Templates', icon: <Grid3X3 size={14} /> },
+              { view: 'pricing' as const, label: 'Pricing', icon: <CreditCard size={14} /> },
+            ].map(item => (
+              <button
+                key={item.view}
+                onClick={() => setView(item.view)}
+                className={`px-3 py-2 rounded-lg text-sm flex items-center gap-1.5 transition ${
+                  state.view === item.view ? 'bg-gray-100 text-black font-medium' : 'text-gray-600 hover:text-black hover:bg-gray-50'
+                }`}
+              >
+                {item.icon} {item.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+        <div className="flex items-center gap-3">
+          {state.currentProject && state.view === 'builder' && (
+            <span className="text-sm text-gray-500 hidden sm:block">{state.currentProject.name}</span>
+          )}
+          <button onClick={() => setState({ showAuthModal: true })} className="w-9 h-9 rounded-full bg-gray-900 flex items-center justify-center text-white text-sm font-medium hover:bg-gray-800 transition">
+            U
+          </button>
+        </div>
       </div>
     </header>
   );
@@ -140,88 +142,185 @@ function LandingView() {
     <div className="h-full flex flex-col">
       <TopNav />
       <main className="flex-1 overflow-auto">
-        <div className="max-w-2xl mx-auto px-4 py-16 md:py-24">
-          {/* Headline */}
-          <div className="text-center mb-10">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium mb-5">
-              <Sparkles size={12} />
+        {/* Page Container */}
+        <div className="max-w-[1400px] mx-auto px-6 py-16 md:py-24">
+          
+          {/* Hero Section */}
+          <div className="text-center mb-12 max-w-[800px] mx-auto">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-50 border border-gray-200 text-gray-700 rounded-full text-sm font-medium mb-6">
+              <Sparkles size={14} className="text-gray-600" />
               AI Website Builder
             </div>
-            <h1 className="text-3xl md:text-5xl font-bold text-black mb-3 leading-tight tracking-tight">
-              Build websites with a sentence.
+            <h1 className="text-[38px] md:text-[48px] lg:text-[64px] font-bold text-black mb-4 leading-[1.05] tracking-tight">
+              Build websites<br />with a sentence.
             </h1>
-            <p className="text-base md:text-lg text-gray-500">
-              Describe your idea. AI turns it into a real website.
+            <p className="text-lg md:text-xl text-gray-600 leading-relaxed">
+              Describe your idea. SiteForge AI turns it into a beautiful, responsive website in minutes.
             </p>
           </div>
 
-          {/* Prompt Box */}
-          <div className="bg-white border border-gray-200 rounded-xl p-3 mb-5 shadow-sm">
-            <textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="e.g. Create a modern website for a coffee shop in Indore with online ordering, menu, and contact..."
-              className="w-full p-3 text-black placeholder-gray-400 resize-none outline-none text-sm min-h-[80px] rounded-lg"
-              rows={3}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleGenerate(); } }}
-            />
-            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-              <button onClick={() => setView('templates')} className="text-xs text-gray-500 hover:text-black flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-50">
-                <Layout size={12} /> Templates
-              </button>
-              <button
-                onClick={handleGenerate}
-                disabled={!prompt.trim()}
-                className="px-4 py-2 bg-black text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1.5 transition"
-              >
-                <Sparkles size={14} />
-                Generate
-              </button>
+          {/* AI Prompt Box */}
+          <div className="max-w-[950px] mx-auto mb-8">
+            <div className="bg-white border border-gray-200 rounded-2xl shadow-lg shadow-gray-100/50 overflow-hidden">
+              <textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="Create a modern website for a luxury women's footwear brand with a hero section, products, testimonials and contact page..."
+                className="w-full p-5 md:p-6 text-base text-black placeholder-gray-400 resize-none outline-none min-h-[130px] leading-relaxed"
+                rows={4}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleGenerate(); } }}
+              />
+              <div className="flex items-center justify-between px-5 md:px-6 py-4 border-t border-gray-100 bg-gray-50/50">
+                <button onClick={() => setView('templates')} className="text-sm text-gray-600 hover:text-black flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-white transition">
+                  <Layout size={14} /> Browse Templates
+                </button>
+                <button
+                  onClick={handleGenerate}
+                  disabled={!prompt.trim()}
+                  className="px-5 py-2.5 bg-black text-white text-sm font-medium rounded-lg hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2 transition shadow-sm"
+                >
+                  <Sparkles size={15} />
+                  Generate Website
+                </button>
+              </div>
             </div>
           </div>
 
           {/* Example Prompts */}
-          <div className="flex flex-wrap justify-center gap-1.5">
-            {examplePrompts.map((ep) => (
-              <button
-                key={ep}
-                onClick={() => handleExampleClick(ep)}
-                className="px-2.5 py-1 border border-gray-200 rounded-full text-xs text-gray-600 hover:border-black hover:text-black transition"
-              >
-                {ep}
-              </button>
-            ))}
+          <div className="max-w-[800px] mx-auto mb-16">
+            <p className="text-center text-sm text-gray-500 mb-3">Try an example:</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {examplePrompts.map((ep) => (
+                <button
+                  key={ep}
+                  onClick={() => handleExampleClick(ep)}
+                  className="px-4 py-2 border border-gray-200 rounded-full text-sm text-gray-700 hover:border-gray-400 hover:bg-gray-50 transition"
+                >
+                  {ep}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Demo button */}
-          <div className="text-center mt-10">
+          {/* Demo CTA */}
+          <div className="text-center mb-20">
             <button
               onClick={() => {
                 const demoPrompt = 'Create a modern SaaS landing page for an AI analytics startup called CloudFlow. Include hero, features, pricing, testimonials, FAQ, and CTA sections.';
                 setState({ isGenerating: true, generationStep: 0 });
                 simulateGeneration(demoPrompt);
               }}
-              className="inline-flex items-center gap-2 px-5 py-2.5 border border-gray-200 text-sm font-medium rounded-lg hover:bg-gray-50 transition"
+              className="inline-flex items-center gap-2 px-6 py-3 border-2 border-gray-300 text-base font-medium rounded-xl hover:border-black hover:bg-gray-50 transition"
             >
-              <Rocket size={14} />
-              Try a demo website
+              <Rocket size={16} />
+              Try a Demo Website
             </button>
           </div>
 
-          {/* Features */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-16">
-            {[
-              { icon: '⚡', title: 'Instant Generation', desc: 'Describe your vision and see it come to life in seconds.' },
-              { icon: '🎨', title: 'AI Design', desc: 'Intelligent themes and layouts tailored to your brand.' },
-              { icon: '📦', title: 'Export Anywhere', desc: 'Download clean HTML or publish directly.' },
-            ].map((f, i) => (
-              <div key={i} className="p-5 border border-gray-100 rounded-xl">
-                <div className="text-xl mb-2">{f.icon}</div>
-                <h3 className="font-medium text-sm text-black mb-1">{f.title}</h3>
-                <p className="text-xs text-gray-500 leading-relaxed">{f.desc}</p>
+          {/* Hero Visual - Browser Mockup */}
+          <div className="max-w-[1100px] mx-auto mb-24">
+            <div className="bg-white border border-gray-200 rounded-xl shadow-2xl shadow-gray-200/50 overflow-hidden">
+              {/* Browser Chrome */}
+              <div className="h-10 bg-gray-100 border-b border-gray-200 flex items-center px-4 gap-2">
+                <div className="flex gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-gray-300" />
+                  <div className="w-3 h-3 rounded-full bg-gray-300" />
+                  <div className="w-3 h-3 rounded-full bg-gray-300" />
+                </div>
+                <div className="flex-1 mx-4">
+                  <div className="bg-white border border-gray-200 rounded-md px-3 py-1 text-xs text-gray-400 text-center max-w-md mx-auto">
+                    siteforge.ai/preview
+                  </div>
+                </div>
               </div>
-            ))}
+              {/* Mock Website Content */}
+              <div className="bg-gradient-to-br from-gray-50 to-white p-12 md:p-16">
+                <div className="max-w-[600px] mx-auto text-center">
+                  <div className="inline-block px-3 py-1 bg-black text-white text-xs font-medium rounded-full mb-4">
+                    ✨ AI Generated
+                  </div>
+                  <h2 className="text-2xl md:text-3xl font-bold text-black mb-3">
+                    Build your business online
+                  </h2>
+                  <p className="text-base text-gray-600 mb-6">
+                    Beautiful. Fast. AI powered.
+                  </p>
+                  <button className="px-6 py-2.5 bg-black text-white text-sm font-medium rounded-lg">
+                    Get Started
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
+
+          {/* Features Section */}
+          <div className="mb-24">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl md:text-4xl font-bold text-black mb-3">
+                Everything you need
+              </h2>
+              <p className="text-lg text-gray-600">
+                Powerful features to build your website in minutes
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[
+                { icon: '⚡', title: 'Instant Generation', desc: 'Describe your idea and generate a complete website in seconds.' },
+                { icon: '🎨', title: 'AI Design', desc: 'AI automatically creates layouts, typography, colors and sections.' },
+                { icon: '🧩', title: 'Visual Editing', desc: 'Modify sections and content without writing code.' },
+                { icon: '💬', title: 'AI Editing', desc: 'Tell the AI what to change and instantly update the website.' },
+                { icon: '📱', title: 'Responsive Design', desc: 'Generate websites that work across desktop, tablet and mobile.' },
+                { icon: '📦', title: 'Export Anywhere', desc: 'Download your website or prepare it for deployment.' },
+              ].map((f, i) => (
+                <div key={i} className="p-6 border border-gray-200 rounded-xl hover:border-gray-300 hover:shadow-lg hover:shadow-gray-100/50 transition-all group">
+                  <div className="text-3xl mb-3 group-hover:scale-110 transition-transform">{f.icon}</div>
+                  <h3 className="font-semibold text-base text-black mb-2">{f.title}</h3>
+                  <p className="text-sm text-gray-600 leading-relaxed">{f.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Template Section */}
+          <div className="mb-16">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl md:text-4xl font-bold text-black mb-3">
+                Start with a template
+              </h2>
+              <p className="text-lg text-gray-600">
+                Choose from professionally designed templates
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {templates.slice(0, 6).map((template) => (
+                <div key={template.id} className="border border-gray-200 rounded-xl overflow-hidden hover:border-gray-300 hover:shadow-lg hover:shadow-gray-100/50 transition-all group">
+                  <div className="h-40 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+                    <span className="text-5xl group-hover:scale-110 transition-transform">{template.preview}</span>
+                  </div>
+                  <div className="p-5">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="font-semibold text-base text-black">{template.name}</h3>
+                      <span className="text-xs px-2 py-1 bg-gray-100 rounded-full text-gray-600">{template.category}</span>
+                    </div>
+                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">{template.description}</p>
+                    <button
+                      onClick={() => {
+                        setView('landing');
+                        setTimeout(() => {
+                          setState({ isGenerating: true, generationStep: 0 });
+                          simulateGeneration(template.prompt);
+                        }, 100);
+                      }}
+                      className="w-full py-2 text-sm font-medium text-black bg-gray-100 rounded-lg hover:bg-gray-200 transition"
+                    >
+                      Use Template
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
         </div>
       </main>
     </div>
