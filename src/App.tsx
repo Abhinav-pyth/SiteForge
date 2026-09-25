@@ -251,7 +251,13 @@ function LandingView() {
                     </span>
                   </div>
                   <p className="text-sm text-neutral-600 mb-4 line-clamp-2">{template.description}</p>
-                  <button className="w-full btn-secondary text-sm">
+                  <button 
+                    onClick={() => {
+                      setPrompt(template.prompt);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="w-full btn-secondary text-sm"
+                  >
                     Use Template
                   </button>
                 </div>
@@ -687,7 +693,18 @@ function TemplatesView() {
                   <span className="text-xs px-2 py-1 bg-neutral-100 rounded-full text-neutral-600">{template.category}</span>
                 </div>
                 <p className="text-sm text-neutral-600 mb-4 line-clamp-2">{template.description}</p>
-                <button className="w-full btn-secondary text-sm">Use Template</button>
+                <button 
+                  onClick={() => {
+                    setView('landing');
+                    setTimeout(() => {
+                      setState({ isGenerating: true, generationStep: 0 });
+                      simulateGeneration(template.prompt);
+                    }, 100);
+                  }}
+                  className="w-full btn-secondary text-sm"
+                >
+                  Use Template
+                </button>
               </div>
             </div>
           ))}
@@ -866,6 +883,25 @@ function PropertiesPanel() {
   const state = useStore();
   const selectedSection = state.currentProject?.website.sections.find(s => s.id === state.selectedSectionId);
 
+  const handlePropertyChange = (key: string, value: string) => {
+    if (!state.currentProject || !selectedSection) return;
+    
+    const updatedProject = { ...state.currentProject };
+    const sectionIndex = updatedProject.website.sections.findIndex(s => s.id === selectedSection.id);
+    
+    if (sectionIndex !== -1) {
+      updatedProject.website.sections[sectionIndex] = {
+        ...selectedSection,
+        config: {
+          ...selectedSection.config,
+          [key]: value
+        }
+      };
+      
+      setState({ currentProject: updatedProject });
+    }
+  };
+
   return (
     <aside className="w-80 border-l border-neutral-200 bg-white overflow-y-auto scrollbar-thin">
       <div className="p-4 border-b border-neutral-200">
@@ -879,7 +915,12 @@ function PropertiesPanel() {
             {Object.entries(selectedSection.config).slice(0, 5).map(([key, value]) => (
               <div key={key}>
                 <label className="text-xs font-medium text-neutral-500 mb-1 block">{key}</label>
-                <input type="text" value={typeof value === 'string' ? value : ''} className="input-field text-sm" readOnly />
+                <input 
+                  type="text" 
+                  value={typeof value === 'string' ? value : ''} 
+                  onChange={(e) => handlePropertyChange(key, e.target.value)}
+                  className="input-field text-sm" 
+                />
               </div>
             ))}
           </div>
